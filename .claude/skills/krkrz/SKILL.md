@@ -1,205 +1,203 @@
 ---
 name: krkrz
-description: 吉里吉里Z (kirikiri Z) 本体クラス API のリファレンス。TJS2 で吉里吉里Z 上のスクリプトを書く、レビューする、デバッグするときに使う。Layer / Window / Bitmap / System / Storages / Font / Plugins / Timer / Debug / AsyncTrigger / Scripts / BinaryStream / Matrix32 / Matrix44 / Rect / ImageFunction のコア API、サウンド系 (WaveSoundBuffer / SoundBuffer / VideoOverlay)、DrawDevice (BasicDrawDevice / SDLDrawDevice / OGLDrawDevice / NullDrawDevice)、OpenGL 描画系 (Canvas / Texture / ShaderProgram / Offscreen / VertexBinder / VertexBuffer)、および主要プラグイン提供クラス (HttpRequest / GdiPlus.* / WIN32Dialog / CSVParser / LineParser / Process / Pad / MenuItem / Unzip / Zip / PSD / SimpleHTTPServer) を網羅。**呼び出されたら必ず「共通パターン」と「クロスカッティング概念」を確認し、必要な詳細クラスは doc/reference/*.md を Read しに行くこと。** TJS2 言語そのものや組み込みクラス (Array / Dictionary / Math 等) は別 skill (`tjs2`) を参照。エンジン内部構造 (C++ 実装、レンダリングパイプライン詳細) は対象外。
+description: 吉里吉里Z (kirikiri Z) 本体クラス API のリファレンス。TJS2 で吉里吉里Z 上のスクリプトを書く、レビューする、デバッグするときに使う。Layer / Window / Bitmap / System / Storages / Font / Plugins / Timer / Debug / AsyncTrigger / Scripts / BinaryStream / Matrix32 / Matrix44 / Rect / ImageFunction のコア API、サウンド系 (WaveSoundBuffer / SoundBuffer / VideoOverlay)、DrawDevice (BasicDrawDevice / SDLDrawDevice / OGLDrawDevice / NullDrawDevice)、OpenGL 描画系 (Canvas / Texture / ShaderProgram / Offscreen / VertexBinder / VertexBuffer)、および主要プラグイン提供クラス (HttpRequest / GdiPlus.* / WIN32Dialog / CSVParser / LineParser / Process / Pad / MenuItem / Unzip / Zip / PSD / SimpleHTTPServer) を網羅。**呼び出されたら必ず「共通パターン」と「クロスカッティング概念」を確認し、必要な詳細クラスは doc/reference/*.md を Read しに行くこと。** TJS2 言語そのものや組み込みクラス (Array / Dictionary / Math 等) は別 skill (`tjs2`) を参照。エンジン内部構造 (C++ 実装、レンダリングパイプライン詳細) は対象外。中文说明：吉里吉里Z（kirikiri Z）引擎本体类 API（Window / Layer / Bitmap / Storages / DrawDevice 等）的参考文档，在 TJS2 中编写、审查、调试吉里吉里Z 脚本时使用。触发词：吉里吉里Z、krkrz、TJS2、引擎本体API、图层、绘制、存储、DrawDevice、事件、插件。
 ---
 
-> **パスの基点**: 本文の相対パスは **krkrz_dev リポジトリルート基準**。作業ディレクトリが krkrz_dev 以外 (krkrz_android / krkrz_ios などの外枠や案件フォルダ) のときは **`${KRKRZ_BASE}/krkrz_dev/` を前置して**読む (`echo $KRKRZ_BASE` で実パスを確認。マシンごとに値が違うので絶対パスは書き込まない)。
+> **路径基点**：本文的相对路径以 **krkrz_dev 仓库根目录为基准**。当工作目录不是 krkrz_dev（如 krkrz_android / krkrz_ios 等外围仓库或项目文件夹）时，请**在前面加上 `${KRKRZ_BASE}/krkrz_dev/`** 再读取（用 `echo $KRKRZ_BASE` 确认实际路径。每台机器的值不同，不要写入绝对路径）。
 
-# 吉里吉里Z 本体クラス API リファレンス
+# 吉里吉里Z 引擎本体类 API 参考文档
 
-吉里吉里Z (kirikiri Z) が TJS2 から見えるクラス API のスキル。スクリプト
-作者の視点で「どのクラスを使うか」「どのメソッドを呼ぶか」を素早く
-引き当てるためのもの。深い説明は reference/*.md を Read で取りに行く。
+这是吉里吉里Z（kirikiri Z）从 TJS2 可见的类 API 技能。从脚本作者的角度，快速定位
+"用哪个类""调用哪个方法"。更深入的说明请用 Read 读取 reference/*.md。
 
-## 重要: 作業に入る前に
+## 重要：开始工作之前
 
-1. **下の「クロスカッティング概念」を必ず確認**。Layer ツリー / イベント /
-   ストレージ / DrawDevice の思考モデルを取り違えると、API の組合せを
-   誤る ( 例: Layer は GUI 部品でもあり描画面でもある、Bitmap は Layer
-   とは別の独立した bits 領域 )。
-2. **TJS2 言語そのものの疑問は別 skill (`tjs2`) を参照**。`var` / 辞書
-   リテラル `%[ ... ]` / `new Foo()` 括弧必須 など、JS と違う文法は
-   そちらに集約してある。
-3. **クラス固有の詳細は `doc/reference/<Class>.md` を Read**。本ファイルは
-   入口で、深掘りは reference にある。
+1. **务必先确认下面的「横切概念」**。如果把 Layer 树 / 事件 /
+   存储 / DrawDevice 的思维模型搞错，就会用错 API 组合（例：Layer 既是 GUI
+   部件也是绘制面，Bitmap 是与 Layer 相互独立的 bits 区域）。
+2. **关于 TJS2 语言本身的问题请参照另一 skill（`tjs2`）**。`var` / 字典
+   字面量 `%[ ... ]` / `new Foo()` 必须带括号 等与 JS 不同的语法都集中在那里。
+3. **类的具体细节请 Read `doc/reference/<Class>.md`**。本文件只是
+   入口，深入内容在 reference 中。
 
-## クロスカッティング概念 (これを取り違えると詰む)
+## 横切概念（搞错这些就会卡死）
 
-### Layer ツリー
+### Layer 树
 
-- 1 ウィンドウは 1 つの **プライマリレイヤ** ([Window.primaryLayer](doc/reference/Window.md#primarylayer)) を持つ
-- [Layer](doc/reference/Layer.md) は親子のツリー構造。`parent`/`children`/`order` で位置決め
-- レイヤは「描画面 (画像を持つ Bitmap)」+「GUI 部品 (フォーカス・カーソル・hint・hitTest)」を **両方兼ねる**
-- 描画関連プロパティ: `width`/`height` (描画領域), `imageWidth`/`imageHeight` (Bitmap 部分), `clip*` (クリップ矩形), `face` (描画面の種類), `type` (合成方式)
-- [Layer.face](doc/reference/Layer.md#face) の値で `dfBoth`/`dfMain`/`dfProvince`/`dfAlpha` 等を切替
-- 入力: `cursor`/`hint`/`hitType`/`focusable`/`enabled` がレイヤ単位、`focused` でフォーカス
-- 描画: `loadImages`/`drawText`/`fillRect`/`copyRect`/`affineCopy` 等。`update()` で再描画フラグ
-- 動的生成は `new Layer(window, parent)` + `setImageSize(w, h)` + `setSize(w, h)` がほぼ定型
+- 1 个窗口拥有 1 个**主图层**（[Window.primaryLayer](doc/reference/Window.md#primarylayer)）
+- [Layer](doc/reference/Layer.md) 是父子树结构。通过 `parent`/`children`/`order` 定位
+- 图层**同时兼有**「绘制面（持有图像的 Bitmap）」+「GUI 部件（焦点・光标・hint・hitTest）」
+- 绘制相关属性：`width`/`height`（绘制区域）、`imageWidth`/`imageHeight`（Bitmap 部分）、`clip*`（裁剪矩形）、`face`（绘制面的种类）、`type`（合成方式）
+- 用 [Layer.face](doc/reference/Layer.md#face) 的值切换 `dfBoth`/`dfMain`/`dfProvince`/`dfAlpha` 等
+- 输入：`cursor`/`hint`/`hitType`/`focusable`/`enabled` 以图层为单位，用 `focused` 控制焦点
+- 绘制：`loadImages`/`drawText`/`fillRect`/`copyRect`/`affineCopy` 等。用 `update()` 设置重绘标志
+- 动态生成基本固定为 `new Layer(window, parent)` + `setImageSize(w, h)` + `setSize(w, h)`
 
-### イベント
+### 事件
 
-- **同期イベント**: メソッド呼び出し中に発生 ( 例: SoundBuffer の `onStatusChanged` を `play` 中に )
-- **非同期イベント**: イベントキュー経由、他のハンドラ完了後に配信 ( 例: `onTimer`、ユーザ入力 )
-- **画面反映も非同期**: 同じハンドラ内で何度 `update` しても、ハンドラから抜けるまで画面に出ない
-- スクリプト側から非同期イベントを起こすには [AsyncTrigger](doc/reference/AsyncTrigger.md)
-- イベントハンドラの登録は **プロパティに関数を代入** ( `layer.onMouseDown = function(x, y, ...) { ... }` )
-- サブクラスから super のハンドラを上書きする場合は `function onTimer() { super.onTimer(...);  ... }` のような書き方
-- 詳細: `doc/guide/EventSystem.md`
+- **同步事件**：在方法调用过程中发生（例：`play` 中触发 SoundBuffer 的 `onStatusChanged`）
+- **异步事件**：经由事件队列，在其他处理器完成后分发（例：`onTimer`、用户输入）
+- **画面反映也是异步的**：即使在同一个处理器内多次调用 `update`，在退出该处理器之前画面也不会更新
+- 从脚本侧产生异步事件使用 [AsyncTrigger](doc/reference/AsyncTrigger.md)
+- 事件处理器的注册方法是**把函数赋值给属性**（`layer.onMouseDown = function(x, y, ...) { ... }`）
+- 在子类中重写 super 的处理器时，写法如 `function onTimer() { super.onTimer(...);  ... }`
+- 详情：`doc/guide/EventSystem.md`
 
-### 統一ストレージ名 ( `file://./...` )
+### 统一存储名（`file://./...`）
 
-- 表記: `メディア://ドメイン/パス` ( 区切りは `/` )
-- ローカルファイル: `file://./c/program files/...` ( Windows ドライブ文字含む )
-- アーカイブ内: `archive.xp3>file.png` (区切り `>`、2.19 beta 14 以降。旧 `#` は `-arcdelim=#` で互換可)
-- 自動検索パス: [Storages.addAutoPath](doc/reference/Storages.md#addautopath) で登録、相対名で findable に
-- 全てのパスは `Storages.getFullPath` で正規化される。`TVP_NO_NORMALIZE_PATH` 未定義ビルドではディレクトリ列挙結果も小文字化
-- 詳細: `doc/guide/StorageSystem.md`
+- 记法：`媒体://域/路径`（分隔符为 `/`）
+- 本地文件：`file://./c/program files/...`（包含 Windows 驱动器号）
+- 归档内：`archive.xp3>file.png`（分隔符 `>`，2.19 beta 14 起。旧的 `#` 可用 `-arcdelim=#` 兼容）
+- 自动搜索路径：用 [Storages.addAutoPath](doc/reference/Storages.md#addautopath) 注册，以相对名变为可查找
+- 所有路径都会经 `Storages.getFullPath` 规范化。在未定义 `TVP_NO_NORMALIZE_PATH` 的构建中，目录枚举结果也会转为小写
+- 详情：`doc/guide/StorageSystem.md`
 
-### ファイル/画像キャッシュ ( 2 層構造 )
+### 文件 / 图像缓存（2 层结构）
 
-- **file 層**: ストレージから読んだバイナリをメモリに保持 ( StorageCache )。`addCacheTargetExtension(ext, minSize)` で対象登録
-- **decode 層**: 画像のデコード結果 Bitmap を保持 ( ImageCache )。`addDecodeTargetExtension(ext, minSize)` で対象登録
-- バックグラウンド prefetch: [Storages.requestCache](doc/reference/Storages.md#requestcache) (両層に発火), [Storages.requestFastCache](doc/reference/Storages.md#requestfastcache)
-- 進行確認: [Storages.isCacheLoading](doc/reference/Storages.md#iscacheloading) (file層), [Storages.isImagePrefetchLoading](doc/reference/Storages.md#isimageprefetchloading) (decode層)
-- pin 管理: [Storages.pinCache](doc/reference/Storages.md#pincache) / [Storages.unpinCache](doc/reference/Storages.md#unpincache) ( pin したものは transient clear で消えない )
-- 全削除/部分削除: [Storages.clearAllCaches](doc/reference/Storages.md#clearallcaches) / [Storages.clearTransientCaches](doc/reference/Storages.md#cleartransientcaches) / [Storages.clearCache](doc/reference/Storages.md#clearcache)
-- エントリ列挙: [Storages.getFileCacheList](doc/reference/Storages.md#getfilecachelist) / [Storages.getImageCacheList](doc/reference/Storages.md#getimagecachelist)
-- 詳細: `doc/topics/core/memory_observation.md`
+- **file 层**：把从存储读出的二进制数据保持在内存中（StorageCache）。用 `addCacheTargetExtension(ext, minSize)` 注册目标
+- **decode 层**：保存图像解码结果的 Bitmap（ImageCache）。用 `addDecodeTargetExtension(ext, minSize)` 注册目标
+- 后台 prefetch：[Storages.requestCache](doc/reference/Storages.md#requestcache)（对两层都触发）、[Storages.requestFastCache](doc/reference/Storages.md#requestfastcache)
+- 进度确认：[Storages.isCacheLoading](doc/reference/Storages.md#iscacheloading)（file 层）、[Storages.isImagePrefetchLoading](doc/reference/Storages.md#isimageprefetchloading)（decode 层）
+- pin 管理：[Storages.pinCache](doc/reference/Storages.md#pincache) / [Storages.unpinCache](doc/reference/Storages.md#unpincache)（被 pin 的内容不会因 transient clear 而消失）
+- 全部删除 / 部分删除：[Storages.clearAllCaches](doc/reference/Storages.md#clearallcaches) / [Storages.clearTransientCaches](doc/reference/Storages.md#cleartransientcaches) / [Storages.clearCache](doc/reference/Storages.md#clearcache)
+- 条目枚举：[Storages.getFileCacheList](doc/reference/Storages.md#getfilecachelist) / [Storages.getImageCacheList](doc/reference/Storages.md#getimagecachelist)
+- 详情：`doc/topics/core/memory_observation.md`
 
-### DrawDevice ( ウィンドウ → 画面への描画器 )
+### DrawDevice（窗口 → 画面的绘制器）
 
-- [Window.drawDevice](doc/reference/Window.md#drawdevice) プロパティで切替可能
-- 4 種: [BasicDrawDevice](doc/reference/Window.BasicDrawDevice.md) (WINVER 既定、Direct3D), [SDLDrawDevice](doc/reference/SDLDrawDevice.md) (SDL3 既定、SDL_Renderer), [OGLDrawDevice](doc/reference/OGLDrawDevice.md) (OpenGL ES、Canvas/Shader/Texture/Offscreen が有効), [NullDrawDevice](doc/reference/NullDrawDevice.md) (描画しない)
-- **OGLDrawDevice は lazy 初期化**: TJS から差し替えた瞬間に GL コンテキスト生成、それまでは Canvas/Texture/Shader 等は使えない
-- 起動時 default は `-drawdevice` オプションで上書き可 ( `sdl` / `sdlogl` / `ogl` )
+- 可通过 [Window.drawDevice](doc/reference/Window.md#drawdevice) 属性切换
+- 4 种：[BasicDrawDevice](doc/reference/Window.BasicDrawDevice.md)（WINVER 默认、Direct3D）、[SDLDrawDevice](doc/reference/SDLDrawDevice.md)（SDL3 默认、SDL_Renderer）、[OGLDrawDevice](doc/reference/OGLDrawDevice.md)（OpenGL ES、Canvas/Shader/Texture/Offscreen 有效）、[NullDrawDevice](doc/reference/NullDrawDevice.md)（不绘制）
+- **OGLDrawDevice 是 lazy 初始化**：从 TJS 替换的瞬间才生成 GL 上下文，在此之前无法使用 Canvas/Texture/Shader 等
+- 启动时的默认值可用 `-drawdevice` 选项覆盖（`sdl` / `sdlogl` / `ogl`）
 
-### OpenGL 系 ( OGLDrawDevice 配下のみ有効 )
+### OpenGL 系（仅在 OGLDrawDevice 之下有效）
 
-- [Canvas](doc/reference/Canvas.md) — OGL 描画コンテキスト、`drawTexture`/`fillRect`/`drawTransition`(表裏2テクスチャのクロスフェード/rule画像ユニバーサルトランジション内蔵、phase 0-1・rule は tcfAlpha・vague 0-255) 等
-- [Texture](doc/reference/Texture.md) — GL テクスチャ。Bitmap や Storage から生成
-- [Offscreen](doc/reference/Offscreen.md) — オフスクリーンレンダーターゲット
-- [ShaderProgram](doc/reference/ShaderProgram.md) — GLSL シェーダ
-- [VertexBuffer](doc/reference/VertexBuffer.md) / [VertexBinder](doc/reference/VertexBinder.md) — 頂点バッファ
-- OGLDrawDevice をアクティブにしていない状態でこれらを new しても無効
+- [Canvas](doc/reference/Canvas.md) — OGL 绘制上下文，`drawTexture`/`fillRect`/`drawTransition`（内建双纹理交叉淡化 / rule 图像通用转场，phase 0-1・rule 为 tcfAlpha・vague 0-255）等
+- [Texture](doc/reference/Texture.md) — GL 纹理。从 Bitmap 或 Storage 生成
+- [Offscreen](doc/reference/Offscreen.md) — 离屏渲染目标
+- [ShaderProgram](doc/reference/ShaderProgram.md) — GLSL 着色器
+- [VertexBuffer](doc/reference/VertexBuffer.md) / [VertexBinder](doc/reference/VertexBinder.md) — 顶点缓冲区
+- 在未激活 OGLDrawDevice 的状态下 new 这些对象也无效
 
-### Bitmap と Layer の関係
+### Bitmap 与 Layer 的关系
 
-- [Bitmap](doc/reference/Bitmap.md) は **独立した bits 領域**。Layer.mainImageBuffer 経由でも触れるが、別オブジェクトとして new できる
-- [BitmapLayerTreeOwner](doc/reference/BitmapLayerTreeOwner.md) は「Layer ツリーを Bitmap に書き出す」のためのコンテナ。スクリーンショットや動的レイヤレンダリングに使う
-- Layer は描画面 + GUI、Bitmap は純粋なピクセル列。混同しない
+- [Bitmap](doc/reference/Bitmap.md) 是**独立的 bits 区域**。也可以通过 Layer.mainImageBuffer 访问，但可以作为独立对象 new
+- [BitmapLayerTreeOwner](doc/reference/BitmapLayerTreeOwner.md) 是把「Layer 树写入 Bitmap」的容器。用于截图和动态图层渲染
+- Layer 是绘制面 + GUI，Bitmap 是纯粹的像素序列。不要混淆
 
-### finalize と invalidate
+### finalize 与 invalidate
 
-- すべてのクラスは GC または明示的 `invalidate` でオブジェクト破棄。`finalize()` メソッドが定義されていれば呼ばれる
-- Window / Layer / Bitmap 等の重量級オブジェクトは明示的 `invalidate` を推奨
-- finalize 内で例外を出すと処理系が苦しむので注意
+- 所有类都通过 GC 或显式 `invalidate` 销毁对象。若定义了 `finalize()` 方法则会被调用
+- 推荐对 Window / Layer / Bitmap 等重量级对象显式调用 `invalidate`
+- 注意：在 finalize 内抛出异常会让处理系统陷入困境
 
-## クラス索引 ( doc/reference/<Name>.md を Read )
+## 类索引（Read doc/reference/<Name>.md）
 
-ファイルは krkrz_dev リポジトリルート相対で `doc/reference/<Name>.md`。
-オンライン版は <https://wamsoft.github.io/krkrz_dev/reference/<name>/> 。
+文件相对于 krkrz_dev 仓库根目录为 `doc/reference/<Name>.md`。
+在线版见 <https://wamsoft.github.io/krkrz_dev/reference/<name>/> 。
 
-### ウィンドウ / レイヤ / 描画
+### 窗口 / 图层 / 绘制
 
-| クラス | 主な役割 |
+| 类 | 主要作用 |
 |---|---|
-| [Window](doc/reference/Window.md) | メインウィンドウ、サイズ、`drawDevice`、入力イベント `onKeyDown`/`onMouseDown` 等、`primaryLayer` |
-| [Layer](doc/reference/Layer.md) | レイヤツリー、Bitmap 描画 (`loadImages` / `drawText` / `fillRect` / `copyRect` / `affineCopy`)、GUI 機能 |
-| [Bitmap](doc/reference/Bitmap.md) | 独立した bits 領域、`load`/`save`/`loadAsync` |
-| [BitmapLayerTreeOwner](doc/reference/BitmapLayerTreeOwner.md) | Layer ツリーを Bitmap に書き出す |
-| [Font](doc/reference/Font.md) | フォント設定 (face / height / italic / bold / strikeout) |
+| [Window](doc/reference/Window.md) | 主窗口、大小、`drawDevice`、输入事件 `onKeyDown`/`onMouseDown` 等、`primaryLayer` |
+| [Layer](doc/reference/Layer.md) | 图层树、Bitmap 绘制（`loadImages` / `drawText` / `fillRect` / `copyRect` / `affineCopy`）、GUI 功能 |
+| [Bitmap](doc/reference/Bitmap.md) | 独立的 bits 区域、`load`/`save`/`loadAsync` |
+| [BitmapLayerTreeOwner](doc/reference/BitmapLayerTreeOwner.md) | 把 Layer 树写入 Bitmap |
+| [Font](doc/reference/Font.md) | 字体设置（face / height / italic / bold / strikeout） |
 | [Rect](doc/reference/Rect.md) | 矩形 |
-| [Matrix32](doc/reference/Matrix32.md) / [Matrix44](doc/reference/Matrix44.md) | 2D / 3D 変換行列 |
-| [ImageFunction](doc/reference/ImageFunction.md) | 画像変換ユーティリティ |
-| [PreRenderedFontImage](doc/reference/PreRenderedFontImage.md) | 事前レンダリングフォント (tftSave plugin 提供) |
+| [Matrix32](doc/reference/Matrix32.md) / [Matrix44](doc/reference/Matrix44.md) | 2D / 3D 变换矩阵 |
+| [ImageFunction](doc/reference/ImageFunction.md) | 图像变换工具 |
+| [PreRenderedFontImage](doc/reference/PreRenderedFontImage.md) | 预渲染字体（tftSave 插件提供） |
 
 ### DrawDevice
 
-| クラス | プラットフォーム |
+| 类 | 平台 |
 |---|---|
-| [BasicDrawDevice](doc/reference/Window.BasicDrawDevice.md) | WINVER 既定 (Direct3D) |
-| [SDLDrawDevice](doc/reference/SDLDrawDevice.md) | SDL3 既定 (SDL_Renderer) |
-| [OGLDrawDevice](doc/reference/OGLDrawDevice.md) | OpenGL ES、Canvas/Shader が有効化される |
-| [NullDrawDevice](doc/reference/NullDrawDevice.md) | 描画なし (ヘッドレス / 検証用) |
+| [BasicDrawDevice](doc/reference/Window.BasicDrawDevice.md) | WINVER 默认（Direct3D） |
+| [SDLDrawDevice](doc/reference/SDLDrawDevice.md) | SDL3 默认（SDL_Renderer） |
+| [OGLDrawDevice](doc/reference/OGLDrawDevice.md) | OpenGL ES、启用 Canvas/Shader |
+| [NullDrawDevice](doc/reference/NullDrawDevice.md) | 不绘制（无头 / 验证用） |
 
-### OpenGL ( OGLDrawDevice 配下のみ )
+### OpenGL（仅 OGLDrawDevice 之下）
 
-| クラス | 役割 |
+| 类 | 作用 |
 |---|---|
-| [Canvas](doc/reference/Canvas.md) | OGL 描画コンテキスト |
-| [Texture](doc/reference/Texture.md) | GL テクスチャ |
-| [Offscreen](doc/reference/Offscreen.md) | オフスクリーンレンダーターゲット |
-| [ShaderProgram](doc/reference/ShaderProgram.md) | GLSL シェーダ |
-| [VertexBuffer](doc/reference/VertexBuffer.md) | 頂点バッファ |
-| [VertexBinder](doc/reference/VertexBinder.md) | 頂点属性バインダ |
+| [Canvas](doc/reference/Canvas.md) | OGL 绘制上下文 |
+| [Texture](doc/reference/Texture.md) | GL 纹理 |
+| [Offscreen](doc/reference/Offscreen.md) | 离屏渲染目标 |
+| [ShaderProgram](doc/reference/ShaderProgram.md) | GLSL 着色器 |
+| [VertexBuffer](doc/reference/VertexBuffer.md) | 顶点缓冲区 |
+| [VertexBinder](doc/reference/VertexBinder.md) | 顶点属性绑定器 |
 
-### サウンド / 動画
+### 声音 / 视频
 
-| クラス | 役割 |
+| 类 | 作用 |
 |---|---|
-| [WaveSoundBuffer](doc/reference/WaveSoundBuffer.md) | 波形音声 (BGM/SE) |
-| [WaveSoundBuffer.PhaseVocoder](doc/reference/WaveSoundBuffer.PhaseVocoder.md) | ピッチ/テンポ独立変更 |
-| [SoundBuffer](doc/reference/SoundBuffer.md) | サウンドバッファ ( PCM 生成等の低レベル ) |
-| [VideoOverlay](doc/reference/VideoOverlay.md) | 動画再生 |
+| [WaveSoundBuffer](doc/reference/WaveSoundBuffer.md) | 波形音频（BGM/SE） |
+| [WaveSoundBuffer.PhaseVocoder](doc/reference/WaveSoundBuffer.PhaseVocoder.md) | 音高 / 速度独立变更 |
+| [SoundBuffer](doc/reference/SoundBuffer.md) | 声音缓冲区（PCM 生成等底层） |
+| [VideoOverlay](doc/reference/VideoOverlay.md) | 视频播放 |
 
-### ストレージ / I/O
+### 存储 / I/O
 
-| クラス | 役割 |
+| 类 | 作用 |
 |---|---|
-| [Storages](doc/reference/Storages.md) | ファイル/アーカイブ操作、auto path、cache 管理 |
-| [BinaryStream](doc/reference/BinaryStream.md) | バイナリストリーム |
+| [Storages](doc/reference/Storages.md) | 文件 / 归档操作、auto path、cache 管理 |
+| [BinaryStream](doc/reference/BinaryStream.md) | 二进制流 |
 
-### システム / イベント / プラグイン
+### 系统 / 事件 / 插件
 
-| クラス | 役割 |
+| 类 | 作用 |
 |---|---|
-| [System](doc/reference/System.md) | OS情報、コマンドライン、メモリ統計、ゲームパッド、`addContinuousHandler` |
-| [Plugins](doc/reference/Plugins.md) | プラグインの link/unlink、`canLink` で事前判定 |
-| [Scripts](doc/reference/Scripts.md) | スクリプトのコンパイル/実行 |
-| [Timer](doc/reference/Timer.md) | 周期/単発タイマ |
-| [AsyncTrigger](doc/reference/AsyncTrigger.md) | 非同期イベントの自前発火 |
-| [Debug](doc/reference/Debug.md) | ログ出力 / コンソール出力 |
-| [Console](doc/reference/Console.md) | コンソールウィンドウ |
-| [Clipboard](doc/reference/Clipboard.md) | クリップボード I/O |
-| [Controller](doc/reference/Controller.md) | コントローラ (デバッグ操作 UI ) |
+| [System](doc/reference/System.md) | OS 信息、命令行、内存统计、手柄、`addContinuousHandler` |
+| [Plugins](doc/reference/Plugins.md) | 插件的 link/unlink，用 `canLink` 预判 |
+| [Scripts](doc/reference/Scripts.md) | 脚本的编译 / 执行 |
+| [Timer](doc/reference/Timer.md) | 周期 / 单发定时器 |
+| [AsyncTrigger](doc/reference/AsyncTrigger.md) | 自行触发异步事件 |
+| [Debug](doc/reference/Debug.md) | 日志输出 / 控制台输出 |
+| [Console](doc/reference/Console.md) | 控制台窗口 |
+| [Clipboard](doc/reference/Clipboard.md) | 剪贴板 I/O |
+| [Controller](doc/reference/Controller.md) | 控制器（调试操作 UI） |
 
-### プラグイン提供クラス (主要)
+### 插件提供的类（主要）
 
-| クラス | 提供 plugin | 用途 |
+| 类 | 提供插件 | 用途 |
 |---|---|---|
-| [HttpRequest](doc/reference/HttpRequest.md) | httprequest | HTTP クライアント |
-| [GdiPlus.Image](doc/reference/GdiPlus.Image.md) / [.Path](doc/reference/GdiPlus.Path.md) / [.Matrix](doc/reference/GdiPlus.Matrix.md) / [.Font](doc/reference/GdiPlus.Font.md) / [.Appearance](doc/reference/GdiPlus.Appearance.md) / [.PointF](doc/reference/GdiPlus.PointF.md) / [.RectF](doc/reference/GdiPlus.RectF.md) | layerExDraw | GDI+ ベクター描画 |
-| [WIN32Dialog](doc/reference/WIN32Dialog.md) / [WIN32DialogEX](doc/reference/WIN32DialogEX.md) / [.Header](doc/reference/WIN32Dialog.Header.md) / [.Items](doc/reference/WIN32Dialog.Items.md) | win32dialog | Win32 ダイアログ |
-| [CSVParser](doc/reference/CSVParser.md) | csvParser | CSV パーサ |
-| [LineParser](doc/reference/LineParser.md) | lineParser | 行パーサ |
-| [Process](doc/reference/Process.md) | process | プロセス起動 |
-| [Pad](doc/reference/Pad.md) | windowEx | ゲームパッド (高機能版) |
-| [MenuItem](doc/reference/MenuItem.md) | menu | メニュー項目 |
+| [HttpRequest](doc/reference/HttpRequest.md) | httprequest | HTTP 客户端 |
+| [GdiPlus.Image](doc/reference/GdiPlus.Image.md) / [.Path](doc/reference/GdiPlus.Path.md) / [.Matrix](doc/reference/GdiPlus.Matrix.md) / [.Font](doc/reference/GdiPlus.Font.md) / [.Appearance](doc/reference/GdiPlus.Appearance.md) / [.PointF](doc/reference/GdiPlus.PointF.md) / [.RectF](doc/reference/GdiPlus.RectF.md) | layerExDraw | GDI+ 矢量绘制 |
+| [WIN32Dialog](doc/reference/WIN32Dialog.md) / [WIN32DialogEX](doc/reference/WIN32DialogEX.md) / [.Header](doc/reference/WIN32Dialog.Header.md) / [.Items](doc/reference/WIN32Dialog.Items.md) | win32dialog | Win32 对话框 |
+| [CSVParser](doc/reference/CSVParser.md) | csvParser | CSV 解析器 |
+| [LineParser](doc/reference/LineParser.md) | lineParser | 行解析器 |
+| [Process](doc/reference/Process.md) | process | 进程启动 |
+| [Pad](doc/reference/Pad.md) | windowEx | 手柄（高功能版） |
+| [MenuItem](doc/reference/MenuItem.md) | menu | 菜单项 |
 | [Unzip](doc/reference/Unzip.md) / [Zip](doc/reference/Zip.md) | minizip | ZIP I/O |
-| [PSD](doc/reference/PSD.md) | psdfile | PSD ファイル読込 |
-| [SimpleHTTPServer](doc/reference/SimpleHTTPServer.md) | httpserv | 簡易 HTTP サーバ |
+| [PSD](doc/reference/PSD.md) | psdfile | PSD 文件读取 |
+| [SimpleHTTPServer](doc/reference/SimpleHTTPServer.md) | httpserv | 简易 HTTP 服务器 |
 
-### 主要ユーティリティプラグイン (Scripts / Array / Dictionary 拡張)
+### 主要工具插件（Scripts / Array / Dictionary 扩展）
 
-これらは吉里吉里本体ではなくプラグインだが、実運用のスクリプトが常時前提にしていることが多い。standalone tool を書くときは自分でリンクが必要:
+这些不是吉里吉里引擎本体而是插件，但实际运营中的脚本经常默认它们存在。写 standalone
+tool 时需要自己链接：
 
-| プラグイン | 提供機能 | 備考 |
+| 插件 | 提供功能 | 备注 |
 |---|---|---|
-| `scriptsEx.dll` | `Scripts.foreach(obj, func, args*)` / `Scripts.getObjectKeys(obj)` / `Scripts.getObjectCount(obj)` / `Scripts.getObjectContext(obj)` / `Scripts.equalStruct(a, b)` / `Scripts.clone(obj)` / `Scripts.propSet` / `Scripts.propGet` | Dictionary の列挙 API は本体に無いので事実上必須 |
-| `saveStruct.dll` | `Array.save2(file, utf8=false, newline=0)` / `Array.saveStruct2(file, utf8, newline, opt)` / `Dictionary.saveStruct2(file, utf8, newline, opt)` / `.toStructString(newline, opt)` | 組み込み `Array.save` は UTF-16 LE + BOM 固定なので、UTF-8 テキスト保存が必要ならこちらを使う |
-| `fstat.dll` | `Storages.dirlistEx(dir)` (size / attrib / 時刻付きの列挙) / ファイル属性の取得・設定 / 時刻の書き込み / `fstat`・`getTime` の `atime`・`ctime` | **`dirlist` / `dirtree` / `createDirectory` / `isExistentDirectory` / `fstat` (size + mtime) / `getTime` (mtime) / `currentPath` (読取) は本体にもある** (リンク不要、全ビルド可)。プラグインを読むと `fstat` / `getTime` / `currentPath` / `dirlistEx` はプラグイン版 (情報の多い版) に置き換わる。ディレクトリ引数は末尾 `/` 必須。SSOT = src/core/doc/LocalFileOps.md |
-| `PackinOne.dll` | 上記 fstat / saveStruct / scriptsEx の一部機能を統合提供 | wamsoft 独自の統合版。ただし link 時に fstat 経由でパス検証が走り、standalone 環境では init throw する場合がある。単機能を欲しいだけなら個別プラグインの方が安全 |
+| `scriptsEx.dll` | `Scripts.foreach(obj, func, args*)` / `Scripts.getObjectKeys(obj)` / `Scripts.getObjectCount(obj)` / `Scripts.getObjectContext(obj)` / `Scripts.equalStruct(a, b)` / `Scripts.clone(obj)` / `Scripts.propSet` / `Scripts.propGet` | 引擎本体没有 Dictionary 的枚举 API，因此事实上必需 |
+| `saveStruct.dll` | `Array.save2(file, utf8=false, newline=0)` / `Array.saveStruct2(file, utf8, newline, opt)` / `Dictionary.saveStruct2(file, utf8, newline, opt)` / `.toStructString(newline, opt)` | 内置 `Array.save` 固定为 UTF-16 LE + BOM，需要保存 UTF-8 文本时用这个 |
+| `fstat.dll` | `Storages.dirlistEx(dir)`（带 size / attrib / 时间的枚举） / 文件属性的获取・设置 / 写入时间 / `fstat`・`getTime` 的 `atime`・`ctime` | **`dirlist` / `dirtree` / `createDirectory` / `isExistentDirectory` / `fstat`（size + mtime） / `getTime`（mtime） / `currentPath`（读取）引擎本体也有**（无需链接，所有构建可用）。读取插件后，`fstat` / `getTime` / `currentPath` / `dirlistEx` 会替换为插件版（信息更多的版本）。目录参数末尾必须带 `/`。SSOT = src/core/doc/LocalFileOps.md |
+| `PackinOne.dll` | 整合提供上述 fstat / saveStruct / scriptsEx 的部分功能 | wamsoft 独有的整合版。但 link 时会经 fstat 执行路径验证，在 standalone 环境中有时会 init throw。只需要单项功能时，分开用各插件更安全 |
 
-**Scripts.foreach の落とし穴** ( scriptsEx.dll ):
-コールバック関数の実行コンテキストは呼び出し元プラグイン側なので、**外側関数の local 変数を参照するとランタイム例外**になる。対策:
-- 追加引数機構を使う: `Scripts.foreach(obj, function(k, v, arg) { ... }, arg)`
-- `Scripts.getObjectKeys(obj)` で keys 配列を取り、素の `for` ループでイテレート (最も確実)
+**Scripts.foreach 的陷阱**（scriptsEx.dll）：
+回调函数的执行上下文在调用方插件侧，因此**引用外层函数的 local 变量会引发运行时异常**。对策：
+- 使用追加参数机制：`Scripts.foreach(obj, function(k, v, arg) { ... }, arg)`
+- 用 `Scripts.getObjectKeys(obj)` 取出 keys 数组，用原生 `for` 循环迭代（最可靠）
 
-詳細は tjs2 skill の「クロージャの落とし穴」も参照。
+更详细的内容也请参照 tjs2 skill 的「闭包的陷阱」。
 
-## 共通パターン
+## 通用模式
 
-### イベントハンドラ登録
+### 事件处理器注册
 
 ```tjs
 // プロパティに関数を代入
@@ -215,7 +213,7 @@ class MyLayer extends Layer {
 }
 ```
 
-### Layer の典型初期化
+### Layer 的典型初始化
 
 ```tjs
 var lay = new Layer(window, parent);
@@ -226,7 +224,7 @@ lay.loadImages("bg/title");    // 自動検索パスから
 lay.visible = true;
 ```
 
-### 非同期画像読み込み + cache
+### 异步图像读取 + cache
 
 ```tjs
 Storages.addCacheTargetExtension(".png");
@@ -235,7 +233,7 @@ Storages.requestCache("bg/title.png");  // 非同期 prefetch
 // ... 後で loadImages したときに cache hit
 ```
 
-### Timer 周期処理
+### Timer 周期处理
 
 ```tjs
 class MyTimer extends Timer {
@@ -244,7 +242,7 @@ class MyTimer extends Timer {
 }
 ```
 
-### DrawDevice 切替で OGL 有効化
+### 切换 DrawDevice 启用 OGL
 
 ```tjs
 // OGLDrawDevice に切替えてから Canvas/Shader 系を new する
@@ -253,16 +251,16 @@ var canvas = new Canvas(window);
 var tex = new Texture(window, "image.png");
 ```
 
-## 関連ドキュメント
+## 相关文档
 
-- ガイド (概念解説): `doc/guide/EventSystem.md`, `doc/guide/StorageSystem.md`, `doc/guide/GraphicSystem.md`, `doc/guide/SoundSystem.md`, `doc/guide/CommandLine.md`
-- 読み上げ (スクリーンリーダー): `doc/guide/Accessibility.md`。Layer に描いた UI は `ElementsDialog.setGameA11y` (ノード表を渡す) か `ElementsDialog.a11yLayers = true` (フォーカス連鎖の Layer を自動で載せる。Layer に `a11yName` / `a11yRole` / `a11yHidden` / `onA11yAction` などを生やして補う — 一覧は `doc/reference/Layer.md` のクラス説明)。任意の文は `ElementsDialog.announce`
-- 周辺情報: `doc/topics/core/*.md` (gamepad〔刻印/位置 2 系統・padStyle〕, viewport, engine_setting, memory_observation, low_memory, draw_stats, pad_overlay, repl, logging, anti_cracking)
-- TJS2 言語本体は別 skill (`tjs2`)
+- 指南（概念解说）：`doc/guide/EventSystem.md`, `doc/guide/StorageSystem.md`, `doc/guide/GraphicSystem.md`, `doc/guide/SoundSystem.md`, `doc/guide/CommandLine.md`
+- 朗读（屏幕阅读器）：`doc/guide/Accessibility.md`。画在 Layer 上的 UI 用 `ElementsDialog.setGameA11y`（传入节点表）或 `ElementsDialog.a11yLayers = true`（自动装载焦点链上的 Layer。可在 Layer 上添加 `a11yName` / `a11yRole` / `a11yHidden` / `onA11yAction` 等来补充 — 列表见 `doc/reference/Layer.md` 的类说明）。任意语句用 `ElementsDialog.announce`
+- 周边信息：`doc/topics/core/*.md`（gamepad〔标识 / 位置 2 套系统・padStyle〕、viewport、engine_setting、memory_observation、low_memory、draw_stats、pad_overlay、repl、logging、anti_cracking）
+- TJS2 语言本体见另一 skill（`tjs2`）
 
-## 関連スキル
+## 相关技能
 
-- skill `tjs2` — TJS2 言語仕様と組込クラス (Array / Dictionary / Math / Date / RegExp / Exception 等)
-- (未作成) 吉里吉里Z 内部構造 / engine internals — C++ 実装、レンダリングパイプライン、SIMD、プラグインローダ等
+- skill `tjs2` — TJS2 语言规格与内置类（Array / Dictionary / Math / Date / RegExp / Exception 等）
+- （未创建）吉里吉里Z 内部结构 / engine internals — C++ 实现、渲染管线、SIMD、插件加载器等
 
-エンジン内部は別 skill 化予定。本スキルは TJS から見える表層 API のみ。
+引擎内部计划另建 skill。本技能只覆盖从 TJS 可见的表层 API。

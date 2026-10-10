@@ -1,192 +1,188 @@
 ---
 name: krkrz-repl
-description: 吉里吉里Z (krkrz) の SDL3 / WINVER ビルドを REPL 経由でエージェントから駆動するためのリファレンス。krkrz を起動して TJS スクリプトを評価・検証・デバッグする、startup.tjs を介さず明示的に処理を開始する、入力イベント (キー/マウス) を注入する、画面をキャプチャして目視確認する、Elements ダイアログを観測・操作する、例外やダイアログ表示をコンソールで観測する、コアデモ全シーンを自動巡回してキャプチャで表示確認する (-demotest / -demotestcap)、といった場面で使う。**外部エージェントは console(CONIN$) に打てないので -replfile ファイルチャネルが本命**。起動フラグ (-repl / -replfile / -nostartup / -loglevel / -display / -ignoremouse)、ファイルチャネルのプロトコル、Agent API (入力注入 / captureScreen / dialogs / dialogClick)、ドットコマンド (.cap/.dlg/.click/.mem 等)、REPL 駆動時の挙動変更 (例外で即終了しない / inform と例外ダイアログがコンソールに出る) を網羅。TJS2 言語仕様そのものは skill `tjs2`、本体クラス API は skill `krkrz` を参照。
+description: 吉里吉里Z (krkrz) の SDL3 / WINVER ビルドを REPL 経由でエージェントから駆動するためのリファレンス。krkrz を起動して TJS スクリプトを評価・検証・デバッグする、startup.tjs を介さず明示的に処理を開始する、入力イベント (キー/マウス) を注入する、画面をキャプチャして目視確認する、Elements ダイアログを観測・操作する、例外やダイアログ表示をコンソールで観測する、コアデモ全シーンを自動巡回してキャプチャで表示確認する (-demotest / -demotestcap)、といった場面で使う。**外部エージェントは console(CONIN$) に打てないので -replfile ファイルチャネルが本命**。起動フラグ (-repl / -replfile / -nostartup / -loglevel / -display / -ignoremouse)、ファイルチャネルのプロトコル、Agent API (入力注入 / captureScreen / dialogs / dialogClick)、ドットコマンド (.cap/.dlg/.click/.mem 等)、REPL 駆動時の挙動変更 (例外で即終了しない / inform と例外ダイアログがコンソールに出る) を網羅。TJS2 言語仕様そのものは skill `tjs2`、本体クラス API は skill `krkrz` を参照。中文说明：从外部 agent 通过 REPL（主要是 -replfile 文件通道）驱动 krkrz，进行 TJS 脚本求值、调试、输入注入、屏幕捕获与目视验证时使用。触发词：REPL 驱动、replfile、文件通道、输入注入、屏幕捕获、点命令、截屏验证、调试脚本、Agent API。
 ---
 
-> **パスの基点**: 本文の相対パスは **engine ルート基準** (krkrz_dev では `src/core/` を前置。下記参照)。作業ディレクトリが krkrz_dev 以外 (krkrz_android / krkrz_ios などの外枠や案件フォルダ) のときは **`${KRKRZ_BASE}/krkrz_dev/` を前置して**読む (`echo $KRKRZ_BASE` で実パスを確認。マシンごとに値が違うので絶対パスは書き込まない)。
+> **路径基准**：正文中的相对路径以 **engine 根**为基准（krkrz_dev 中需前置 `src/core/`，见下文）。工作目录不是 krkrz_dev（如 krkrz_android / krkrz_ios 等外围仓库或项目文件夹）时，请**前置 `${KRKRZ_BASE}/krkrz_dev/`** 再读取（用 `echo $KRKRZ_BASE` 确认实际路径。每台机器的值不同，因此不要写入绝对路径）。
 
-# krkrz REPL 駆動リファレンス
+# krkrz REPL 驱动参考
 
-krkrz SDL3 ビルドには対話型 TJS シェル (REPL) が組み込まれている
-(engine の `common/utils/REPL.cpp`)。エージェントが krkrz を立ち上げて
-スクリプトを評価・検証するための仕組み。
+krkrz SDL3 构建内置了交互式 TJS shell（REPL）（位于 engine 的 `common/utils/REPL.cpp`）。
+这是 agent 启动 krkrz 后对脚本进行求值、验证的机制。
 
-## リポジトリ構成による読み替え (最初に確認)
+## 按仓库构成进行路径替换（先确认）
 
-このスキルは engine repo (krkrz.git / krkrz_develop.git) を対象にするが、
-チェックアウト形態が 2 通りあり、**engine ソースのパス表記だけが異なる**。
-REPL / Agent のプロトコルや TJS 側の使い方は同一。
+本技能以 engine 仓库（krkrz.git / krkrz_develop.git）为对象，但检出形态有 2 种，
+**只有 engine 源码的路径写法不同**。REPL / Agent 的协议和 TJS 侧用法完全相同。
 
-| 形態 | engine ルート | 例: REPL 実装 | data 既定 | ビルド |
+| 形态 | engine 根 | 例：REPL 实现 | data 默认 | 构建 |
 |---|---|---|---|---|
-| engine 単独 (`krkrz` 等) | リポ直下 | `common/utils/REPL.cpp` | `data/` | `cmake --preset x64-windows` |
-| umbrella (`krkrz_dev`) | `src/core/` | `src/core/common/utils/REPL.cpp` | `src/core/data/` | `make`(プリセットは `src/core/CMakePresets.json`) |
+| engine 单仓库（`krkrz` 等） | 仓库根下 | `common/utils/REPL.cpp` | `data/` | `cmake --preset x64-windows` |
+| umbrella（`krkrz_dev`） | `src/core/` | `src/core/common/utils/REPL.cpp` | `src/core/data/` | `make`（预设为 `src/core/CMakePresets.json`） |
 
-以降の本文は engine ルート相対 (`common/...`, `sdl3/...`, `doc/...`) で書く。
-**umbrella で作業しているなら `src/core/` を前置して読む**。
+下文均以 engine 根为基准相对书写（`common/...`、`sdl3/...`、`doc/...`）。
+**在 umbrella 中工作的话，请前置 `src/core/` 再阅读**。
 
-**REPL 本体 + `-replfile` チャネルは全デスクトップ変種で有効** (`KRKRZ_REPL`
-は `KRKRZ_DESKTOP` 既定。WIN32 = ON なので **WINVER (`x64-windows-win`) でも
-TJS eval / 状態確認が `-replfile` でできる**)。REPL/実行キュー/ファイルチャネルは
-`common/` にあり SDL 非依存。**Agent API・captureScreen も WINVER 対応済**
-(2026-07-31):
-- **Agent API** は `common/environ/AgentControlIntf.cpp` に共通化済。入力注入だけ
-  `AgentInput` seam (`generic/environ/AgentInput.cpp` = SendMouseMessage/SendMessage、
-  `win32/environ/AgentInput.cpp` = OnMouse*/OnKey*) でプラットフォーム分離。SDL3 /
-  WINVER 両方で `Agent.click` / `keyPress` / `dialogs` / `dialogClick` / `text` が動く。
-- **screencapture** も `BasicDrawDevice::FulfillScreenCapture[FromBackBuffer]` 実装済で
-  WINVER で `System.captureScreen` / `Agent.captureScreen` が overlay 込み PNG を保存できる。
+**REPL 引擎本体 + `-replfile` 通道在所有桌面变体中有效**（`KRKRZ_REPL`
+默认跟随 `KRKRZ_DESKTOP`。WIN32 = ON，因此 **WINVER（`x64-windows-win`）也能用
+`-replfile` 进行 TJS eval / 状态确认**）。REPL / 执行队列 / 文件通道都位于
+`common/`，与 SDL 无关。**Agent API・captureScreen 也已支持 WINVER**
+（2026-07-31）：
+- **Agent API** 已统一到 `common/environ/AgentControlIntf.cpp`。输入注入通过
+  `AgentInput` seam（`generic/environ/AgentInput.cpp` = SendMouseMessage/SendMessage、
+  `win32/environ/AgentInput.cpp` = OnMouse*/OnKey*）做平台分离。SDL3 /
+  WINVER 下 `Agent.click` / `keyPress` / `dialogs` / `dialogClick` / `text` 均可使用。
+- **screencapture** 也已实现 `BasicDrawDevice::FulfillScreenCapture[FromBackBuffer]`，
+  WINVER 下 `System.captureScreen` / `Agent.captureScreen` 可保存含 overlay 的 PNG。
 
-したがって **WINVER でも SDL3 と同様に GUI 検証 (入力注入 + captureScreen 目視) が可能**。
-SDL3 専用として残るのは起動時 UserConfig UI (`-userconf`、ゲーム窓生成前の独立 OS
-ウィンドウが必須) のみ。
+因此 **WINVER 也能像 SDL3 一样进行 GUI 验证（输入注入 + captureScreen 目视确认）**。
+仍为 SDL3 专用的只有启动时 UserConfig UI（`-userconf`，需要在游戏窗口生成前创建
+独立 OS 窗口）。
 
-## 重要: 作業に入る前に
+## 重要：开工前须知
 
-1. **外部エージェント (Claude) が GUI の krkrz を駆動するなら `-replfile=<dir>`
-   ファイルチャネルを使う**。`-repl` の console REPL は Windows で `CONIN$`
-   (実コンソール) を読むため、ツールからは打ち込めない。ファイルチャネルなら
-   `cmd`/`resp` ファイルの Write/Read だけで逐次駆動でき、`captureScreen` の
-   PNG を Read で目視確認できる。→ 下の「ファイルチャネル駆動」。
-2. REPL 駆動時は **例外で即終了しない / inform・例外ダイアログがネイティブ
-   message box でなくコンソールに出る**。この差分を前提にログを読む。
-3. `-replfile` と `-repl` は独立に起動できる (両方同時も可)。メイン実行は
-   共有キュー `ReplMainQueue` で直列化される。
+1. **外部 agent（Claude）驱动 GUI 版 krkrz 时，请使用 `-replfile=<dir>`
+   文件通道**。`-repl` 的 console REPL 在 Windows 上读取 `CONIN$`
+   （实际控制台），工具无法向其输入。文件通道只需 Write/Read `cmd`/`resp`
+   文件即可逐步驱动，还能 Read `captureScreen` 生成的 PNG 做目视确认。
+   → 见下文「文件通道驱动」。
+2. REPL 驱动期间**出现异常不会立即退出 / inform・异常对话框不以原生
+   message box 而是输出到控制台**。请以这一差异为前提阅读日志。
+3. `-replfile` 与 `-repl` 可独立启动（也可同时启用）。主执行通过
+   共享队列 `ReplMainQueue` 串行化。
 
-## 起動フラグ
+## 启动参数
 
-| フラグ | 意味 |
+| 参数 | 含义 |
 |---|---|
-| `-repl` | console REPL (CONIN$ 直読み) を起動。人間の対話向け。`-repl=no/off/false/0` で抑止。 |
-| `-replfile=<dir>` | **ファイルチャネルを起動 (外部エージェント向け、本命)**。`<dir>` の `cmd`/`resp` ファイルで駆動。`-repl` と独立。 |
-| `-replweb[=port]` | HTTP+SSE サーバ (既定 127.0.0.1:8899)。`GET /`=ブラウザ REPL ページ / `GET /events`=ログ SSE / `POST /cmd`=TJS 評価 / `GET /sub/<ch>`=汎用 SSE / `GET|POST /watch` + `GET /sub/watch`=監視式。`GET /` は Console / Watch / Pad のタブ UI (上のバーにイベント停止 / 終了)。`POST /pad/exec` は複数行スクリプトをまるごと実行できる。**`-replwebidle` は既定 5 秒で有効** = ブラウザを閉じたらアプリも終了 (`=no` で無効。ただし **一度でも SSE 購読が来てから武装**するので、curl だけ / 未接続の駆動は落ちない)。`-replwebopen=app|tab|no` で端末起動時もブラウザを開ける。**curl でも駆動できる** (`curl -X POST -d 'expr' http://127.0.0.1:8899/cmd`)。 |
-| `-nostartup` | startup.tjs の自動実行を抑止。window 無し起動でも即終了しない。明示的にスクリプトを呼んで初めて処理が始まる。`-nostartup=no/off/false/0` で無効。 |
-| `-loglevel=info` | ログレベル。コンソールに出る量を制御。`MASTER` ビルドだと既定 WARNING。 |
-| `-display=<番号\|名前>` | 起動するディスプレイ (モニタ) の指定。**マルチディスプレイ環境でメインディスプレイを占有せずに検証したいときに使う**。番号は 1 origin (Windows の `\\.\DISPLAYn` の n)、名前はモニタ名の部分一致、`primary` も可。`-display=list` で一覧をログ出力。WINVER / SDL3 両対応。 |
+| `-repl` | 启动 console REPL（直接读取 CONIN$）。面向人类交互。可用 `-repl=no/off/false/0` 抑制。 |
+| `-replfile=<dir>` | **启动文件通道（面向外部 agent，主力方式）**。通过 `<dir>` 下的 `cmd`/`resp` 文件驱动。与 `-repl` 相互独立。 |
+| `-replweb[=port]` | HTTP+SSE 服务器（默认 127.0.0.1:8899）。`GET /`=浏览器 REPL 页面 / `GET /events`=日志 SSE / `POST /cmd`=TJS 求值 / `GET /sub/<ch>`=通用 SSE / `GET|POST /watch` + `GET /sub/watch`=监视表达式。`GET /` 为 Console / Watch / Pad 标签页 UI（顶栏有事件停止 / 退出）。`POST /pad/exec` 可整体执行多行脚本。**`-replwebidle` 默认 5 秒有效** = 关闭浏览器后应用也随之退出（`=no` 可禁用。不过它会**收到至少一次 SSE 订阅后才进入待命**，因此仅 curl / 未连接的驱动不会退出）。用 `-replwebopen=app|tab|no` 可在从终端启动时也打开浏览器。**也可用 curl 驱动**（`curl -X POST -d 'expr' http://127.0.0.1:8899/cmd`）。 |
+| `-nostartup` | 抑制 startup.tjs 的自动执行。无 window 启动也不会立即退出。只有明确调用脚本后处理才开始。可用 `-nostartup=no/off/false/0` 禁用。 |
+| `-loglevel=info` | 日志级别。控制输出到控制台的信息量。`MASTER` 构建默认 WARNING。 |
+| `-display=<番号\|名前>` | 指定启动所用的显示器（监视器）。**多显示器环境下不想占用主显示器做验证时使用**。编号为 1 origin（Windows `\\.\DISPLAYn` 的 n）、名称取监视器名的部分匹配，也支持 `primary`。`-display=list` 可把列表输出到日志。WINVER / SDL3 均支持。 |
 
-> ⚠ **`-replweb` の既定ポート 8899 は PC 全体で 1 つ**。 別のセッション
-> (あるいは user 本人) の krkrz が先に握っていると、 後から起動した自分の
-> アプリはポートを取れないのに **自分のログには `listening on http://127.0.0.1:8899/` が出る**ので気付けず、 `curl` は
-> **相手のアプリを駆動する**。 検証で起動するときは **`-replweb=<固有ポート>` を明示**すること
-> (ブラウザを開かせたくなければ `-replwebopen=no` も)。 `-replfile` の
-> チャネルは自分のディレクトリなので必ず自分のアプリに届く — **HTTP とファイルチャネルで
-> 結果が食い違ったらこれを疑う**。 確定は `Get-CimInstance Win32_Process -Filter "Name='krkrz64.exe'"` で
-> ExecutablePath / CommandLine を見る。
+> ⚠ **`-replweb` 的默认端口 8899 在整台 PC 上只有 1 个**。如果其他会话
+> （或 user 本人）的 krkrz 先占用了它，后启动的自己的应用抢不到端口，
+> 可**自己的日志里却照样输出 `listening on http://127.0.0.1:8899/`**，
+> 让人难以察觉，而 `curl` **驱动的是对方的应用**。验证启动时请**显式指定
+> `-replweb=<固有ポート>`**（不想打开浏览器时再加上 `-replwebopen=no`）。
+> `-replfile` 的通道是自己的目录，必然到达自己的应用 —— **HTTP 与文件通道
+> 结果不一致时先怀疑这一点**。确认方法是用 `Get-CimInstance Win32_Process -Filter "Name='krkrz64.exe'"` 查看
+> ExecutablePath / CommandLine。
 
-### WebServer クラス (`-replweb` の拡張登録口)
+### WebServer 类（`-replweb` 的扩展注册入口）
 
-`KRKRZ_REPL_WEB` ビルドではスクリプト/プラグインが web サーバへ機能を追加公開できる
-(常時登録可、サーバ稼働時のみ配信)。**ハンドラは常にメインスレッド実行**。
+`KRKRZ_REPL_WEB` 构建中，脚本 / 插件可向 web 服务器追加公开功能
+（可随时注册，仅服务器运行时提供）。**处理器始终在主线程执行**。
 
-- `WebServer.register(prefix, handler)` — 動的ハンドラ (最長一致)。
-  `handler(%[method,path,query,body,bytes])` → 文字列=200 JSON / octet /
+- `WebServer.register(prefix, handler)` — 动态处理器（最长匹配）。
+  `handler(%[method,path,query,body,bytes])` → 字符串=200 JSON / octet /
   整数=status / void=204 / `%[status,mime,body]`
-- `WebServer.serveStatic(prefix, storageDir)` — Storages 経由の静的配信 (".." 拒否)
-- `WebServer.broadcast(channel, text)` — `/sub/<channel>` 購読者へ SSE 配信
-- `WebServer.active` / `WebServer.url` (= `System.replWebURL`)
+- `WebServer.serveStatic(prefix, storageDir)` — 经 Storages 的静态文件服务（拒绝 ".."）
+- `WebServer.broadcast(channel, text)` — 向 `/sub/<channel>` 订阅者 SSE 分发
+- `WebServer.active` / `WebServer.url`（= `System.replWebURL`）
 
-詳細は engine `doc/REPL.md` の「ブラウザ REPL / Web サーバ」節。threepp の
-ブラウザ編集 UI (threepp/docs/webui.md, `/ui/` + `/app/` + `/api/three/`) が実利用例。
-検証は curl で足りる: ハンドラ登録は `-replfile` チャネルか `/cmd` から eval →
-`curl http://127.0.0.1:8899/<path>` で応答確認。
+详见 engine `doc/REPL.md` 的「浏览器 REPL / Web 服务器」一节。threepp 的
+浏览器编辑 UI（threepp/docs/webui.md、`/ui/` + `/app/` + `/api/three/`）是实际用例。
+验证用 curl 就够：处理器注册通过 `-replfile` 通道或 `/cmd` eval →
+再用 `curl http://127.0.0.1:8899/<path>` 确认响应。
 
-代表的なエージェント起動 (ファイルチャネル + ゲーム画面あり):
+代表性的 agent 启动方式（文件通道 + 带游戏画面）：
 
 ```
 krkrz64.exe <ABS_DATA_DIR> -replfile=<ABS_CHANNEL_DIR>
 ```
 
-`-nostartup` を付けると startup.tjs を実行しない静止起動 (window も無い)。
-描画やダイアログ検証には window が要るので、その場合はチャネルから明示的に
-Window を作るか、startup.tjs を実行させる。
+加上 `-nostartup` 后为不执行 startup.tjs 的静止启动（也没有 window）。
+绘制和对话框验证需要 window，此时需从通道显式创建 Window，或执行 startup.tjs。
 
-exe は krkrz_dev のビルド出力を使う (リポジトリルート相対):
+exe 使用 krkrz_dev 的构建产物（相对仓库根）：
 
-- SDL3 版:   `build/x64-windows/core/Release/krkrz64.exe`
-- WINVER 版: `build/x64-windows-win/core/Release/krkrz64.exe`
+- SDL3 版：   `build/x64-windows/core/Release/krkrz64.exe`
+- WINVER 版： `build/x64-windows-win/core/Release/krkrz64.exe`
 
-プロセスの起動・停止は skill `dev-toolkit:appctl` の規約に従うこと (PID を記録し、停止は
-その PID のみ・exe パス照合付き。`taskkill /IM krkrz64.exe` のようなイメージ名
-一括 kill は並行セッションを巻き添えにするため禁止)。`dev-toolkit:appctl` は
-プラグイン `dev-toolkit` 収録なので、同梱ヘルパ `scripts/appctl.sh` の位置は
-そちらの SKILL.md を見る (`$APPCTL` に入れてある想定で以下は書く)。
+进程的启动 / 停止请遵循 skill `dev-toolkit:appctl` 的约定（记录 PID，停止时
+只停该 PID・带 exe 路径核对。像 `taskkill /IM krkrz64.exe` 这样按镜像名
+批量 kill 会连累并行会话，禁止使用）。`dev-toolkit:appctl` 收录在
+插件 `dev-toolkit` 中，随附辅助 `scripts/appctl.sh` 的位置请看
+其 SKILL.md（下文按已放入 `$APPCTL` 的前提书写）。
 
-シェル操作そのものは skill `dev-toolkit:msys2` の起動定型に従う
-(`MSYSTEM=MSYS /c/msys64/usr/bin/bash.exe -lc '...'`)。素の `bash` 呼びは
-Git Bash を引いてしまう。
+shell 操作本身遵循 skill `dev-toolkit:msys2` 的启动惯例
+（`MSYSTEM=MSYS /c/msys64/usr/bin/bash.exe -lc '...'`）。直接调用 `bash`
+会引到 Git Bash 上。
 
 ```bash
 export APPCTL_DIR="$SCRATCHPAD/appctl"
-S="$APPCTL"                    # dev-toolkit:appctl の scripts/appctl.sh
+S="$APPCTL"                    # dev-toolkit:appctl 的 scripts/appctl.sh
 CH="$SCRATCHPAD/replchan"
 
-bash "$S" start krkr \
+bash "$S" start krkrz \
   "$REPO/build/x64-windows-win/core/Release/krkrz64.exe" \
   "$REPO/src/core/data" -readencoding=UTF-8 -replfile="$CH" -loglevel=info
 # ... チャネル経由で評価・検証 ...
-bash "$S" stop krkr
+bash "$S" stop krkrz
 ```
 
-### パスの落とし穴
+### 路径陷阱
 
-プロジェクトディレクトリ引数は **exe からの相対**で解決される。リポジトリの
-data ディレクトリを使うなら **絶対パス**で渡す。相対 `data/` だと
-`build/.../Release/data/` を探して "startup.tjs が見つかりません" になる。
+项目目录参数按**相对 exe 的路径**解析。使用仓库的
+data 目录时请传入**绝对路径**。若传相对 `data/`，会去查找
+`build/.../Release/data/`，从而变成 "startup.tjs が見つかりません"（找不到 startup.tjs）。
 
-リポジトリルート相対では `src/core/data/` ( umbrella の場合 )。engine 単独チェックアウト
-なら `data/`。いずれも **絶対パスに展開して**渡すこと。
+相对仓库根为 `src/core/data/`（umbrella 的情况）。engine 单仓库检出
+则为 `data/`。无论哪种都请**展开为绝对路径**再传入。
 
-## REPL 駆動時の挙動変更 (このビルドで実装済み)
+## REPL 驱动时的行为变化（本构建已实现）
 
-`TVPReplActive` (REPL 起動中 true、`SysInitIntf.h`) を見て、`Application->MessageDlg`
-を呼ぶ各ラッパ側で分岐している (override 実装の `SDL3Application::MessageDlg`
-本体は無改造)。
+通过检查 `TVPReplActive`（REPL 运行中为 true、`SysInitIntf.h`），在调用
+`Application->MessageDlg` 的各包装器侧进行分支（override 实现
+`SDL3Application::MessageDlg` 的主体未改动）。
 
-- **例外で即終了しない**: `TVPShowScriptException` は REPL 中、ネイティブ
-  ダイアログ表示も `TVPTerminateSync` も行わず、例外メッセージ + trace を
-  `TVPAddImportantLog` でコンソールに出すだけ。修正して再 eval できる。
-- **System.inform → コンソール**: `TVPShowSimpleMessageBox` が REPL 中は
-  `[dialog] caption: text` をログに出すだけで、ブロッキングな message box を
-  出さない (既定応答で進む。応答取得は将来拡張)。
-- **致命エラー (ShowException)**: `TVPLOG_CRITICAL` で出力済みなので REPL 中は
-  message box を抑止。
-- **System.confirm / Storages.selectFile / Storages.selectDirectory → エージェント応答**:
-  REPL 中はネイティブモーダルを出さず、下記「モーダル応答チャネル」でエージェントが
-  実際に応答を返せる (応答口が無ければ confirm は既定 Yes、選択はネイティブへ)。
-  `System.inputString` も本体実装済みでこのチャネルに乗る (2026-09-25 実測)。
+- **出现异常不会立即退出**：REPL 期间 `TVPShowScriptException` 既不显示原生
+  对话框也不调用 `TVPTerminateSync`，只把异常消息 + trace 通过
+  `TVPAddImportantLog` 输出到控制台。修正后可重新 eval。
+- **System.inform → 控制台**：REPL 期间 `TVPShowSimpleMessageBox`
+  只把 `[dialog] caption: text` 写入日志，不弹出阻塞的 message box
+  （按默认响应继续。获取响应为将来扩展）。
+- **致命错误（ShowException）**：已通过 `TVPLOG_CRITICAL` 输出，REPL 期间
+  抑制 message box。
+- **System.confirm / Storages.selectFile / Storages.selectDirectory → agent 响应**：
+  REPL 期间不弹出原生模式对话框，agent 可通过下文「模式响应通道」实际
+  返回响应（没有响应口时，confirm 默认 Yes、选择走原生）。
+  `System.inputString` 也已由引擎本体实现，走同一通道（2026-09-25 实测）。
 
-## モーダル応答チャネル (confirm / 文字列入力 / 選択肢 / ファイル選択)
+## 模式响应通道（confirm / 字符串输入 / 候选值 / 文件选择）
 
-`-replfile=<dir>` 駆動中、本体が `System.confirm` / `System.inputString` / `System.choice` /
-`Storages.selectFile` / `Storages.selectDirectory` を実行すると、**cmd/resp とは別の専用ファイル対**で
-応答を求めてくる。メイン実行はブロックするが、応答は別プロセス (エージェント) が
-直接書くのでデッドロックしない。
+在 `-replfile=<dir>` 驱动期间，当引擎本体执行 `System.confirm` / `System.inputString` / `System.choice` /
+`Storages.selectFile` / `Storages.selectDirectory` 时，会通过**与 cmd/resp 不同的专用文件对**来
+索取响应。主执行会被阻塞，但响应由另一进程（agent）直接写入，因此不会死锁。
 
-プロトコル (`<dir>` 配下、cmd を投げた後):
-1. 本体が要求 JSON を `<dir>/modal` に書く。例:
+协议（在 `<dir>` 下、投出 cmd 之后）：
+1. 引擎本体把请求 JSON 写入 `<dir>/modal`。例：
    - `{"type":"confirm","caption":"確認","text":"続行?"}`
    - `{"type":"inputString","caption":"題名","prompt":"入力してください","default":"きてい"}`
    - `{"type":"choice","caption":"確認","text":"保存しますか?","choices":["yes","no","cancel"],"default":2}`
    - `{"type":"selectFile","name":"","title":"開く","save":false}`
    - `{"type":"selectDirectory","name":"","title":"フォルダ","save":false}`
-2. エージェントは `modal` の出現を検知し、応答を **`<dir>/modalresp`** に書く
-   (プレーン文字列):
-   - confirm         : `yes` `y` `1` `true` `ok` が真、**それ以外は偽**
-   - inputString     : `ok<改行><入力値>` / `cancel` 単独でキャンセル (void が返る)
-   - choice          : 選んだ要素の文字列 (大小文字は区別しない) か index。空 / 該当しない値 = `default`
-   - selectFile/Dir  : 返すパス (直接入力でよい) / 空文字列 = キャンセル
+2. agent 检测到 `modal` 出现后，把响应写入 **`<dir>/modalresp`**
+   （纯字符串）：
+   - confirm         : `yes` `y` `1` `true` `ok` 为真，**其余均为假**
+   - inputString     : `ok<改行><入力値>` / 单独 `cancel` 表示取消（返回 void）
+   - choice          : 所选元素的字符串（不区分大小写）或 index。空 / 不匹配的值 = `default`
+   - selectFile/Dir  : 要返回的路径（可直接输入）/ 空字符串 = 取消
 
-   ⚠ **種別ごとにキャンセルの書き方が違う**。汎用の 1 文字列では済まないので
-   `modal` の `"type"` を見て振り分けること (`cancel` を selectFile に返すと
-   「cancel という名前のパスを選んだ」ことになる)。
-3. 本体が `modalresp` を読み、`modal`/`modalresp` を削除して処理続行 → 通常どおり
-   `resp` に最終結果が出る。
+   ⚠ **每种类型的取消写法都不同**。不能用通用的 1 个字符串应付，
+   需查看 `modal` 的 `"type"` 来区分（把 `cancel` 返回给 selectFile
+   会被当成「选择了名为 cancel 的路径」）。
+3. 引擎本体读取 `modalresp`，删除 `modal`/`modalresp` 后继续处理 → 照常
+   把最终结果写入 `resp`。
 
-つまり **selectFile/selectDirectory はダイアログを出さず、エージェントが返したい
-パスを `modalresp` に直接書けばそれが選択結果になる** (`name` に正規化されて書き戻る)。
+也就是说 **selectFile/selectDirectory 不弹出对话框，agent 把想返回的
+路径直接写入 `modalresp`，那就是选择结果**（会按 `name` 规范化写回）。
 
-手順のキモ: `cmd` を投げたら `resp` を待つ前に **`modal` の出現をポーリング**し、
-出たら `modalresp` を書く。その後 `resp` が出る。PowerShell 例:
+步骤的关键：投出 `cmd` 后、在等待 `resp` 之前**轮询 `modal` 是否出现**，
+出现就写 `modalresp`。之后 `resp` 才会出现。PowerShell 示例：
 ```powershell
 # cmd 送信後
 while (-not (Test-Path "$chan/modal")) { Start-Sleep -Milliseconds 30 }
@@ -194,28 +190,28 @@ while (-not (Test-Path "$chan/modal")) { Start-Sleep -Milliseconds 30 }
 # この後 $chan/resp が出るので通常どおり読む
 ```
 
-⚠ **答えないと `resp` は返らない**。本体は既定 30 秒 (`-replmodaltimeout=<秒>`、0 で無限)
-待ってから TJS 例外を投げる。モーダルを出しうる式を投げるハーネスは、`resp` 待ちループの中で
-`modal` も見て、出たら種別に応じて答えること。
+⚠ **不回答就不会返回 `resp`**。引擎本体默认等待 30 秒（`-replmodaltimeout=<秒>`，0 为无限）
+后抛出 TJS 异常。投出可能弹出模式对话框的表达式的测试框架，要在 `resp` 等待循环中
+同时盯住 `modal`，出现时按类型回答。
 
-スクリプト側から「いま REPL で駆動されているか」は `System.replActive` (読み取り専用) で分かる。
-⚠ WINVER では REPL が起動スクリプトの後に有効になるので、`startup.tjs` の実行中はまだ偽
-(SDL3 は起動時から真)。起動直後の判定は `System.getArgument("-replfile")` を併用する。
+脚本侧可通过 `System.replActive`（只读）判断「当前是否正被 REPL 驱动」。
+⚠ WINVER 下 REPL 在启动脚本之后才生效，因此 `startup.tjs` 执行期间仍为假
+（SDL3 从启动时即为真）。启动瞬间的判断可并用 `System.getArgument("-replfile")`。
 
-## ファイルチャネル駆動 (エージェント推奨)
+## 文件通道驱动（agent 推荐）
 
-`-replfile=<dir>` で起動すると、`<dir>` 配下のファイルで REPL を駆動できる。
-console を介さないので Claude のツール (Write/Read) でそのまま操作できる。
+用 `-replfile=<dir>` 启动后，可通过 `<dir>` 下的文件驱动 REPL。
+不经由 console，因此可直接用 Claude 的工具（Write/Read）操作。
 
-プロトコル (lockstep):
+协议（lockstep）：
 
-1. コマンド (UTF-8 TJS) を `<dir>/cmd.tmp` に書き、`<dir>/cmd` に rename。
-2. チャネルが実行し、結果 JSON を `<dir>/resp` に書く
-   (`{"ok":bool,"result":"<pretty>","error":"<msg>"}`)。
-3. `resp` の出現を待って読み、**削除してから**次の `cmd` を出す。
-   (未読 `resp` が残る間は次コマンドを処理しない)
+1. 把命令（UTF-8 TJS）写入 `<dir>/cmd.tmp`，再 rename 为 `<dir>/cmd`。
+2. 通道执行后，把结果 JSON 写入 `<dir>/resp`
+   （`{"ok":bool,"result":"<pretty>","error":"<msg>"}`）。
+3. 等待 `resp` 出现并读取，**删除之后**再发出下一条 `cmd`。
+   （存在未读 `resp` 期间不处理下一条命令）
 
-PowerShell ヘルパ例 (Move-Item で atomic rename → resp 待ち):
+PowerShell 辅助示例（用 Move-Item 做 atomic rename → 等待 resp）：
 
 ```powershell
 function Send-Cmd($script, $timeoutMs = 5000) {
@@ -232,60 +228,60 @@ function Send-Cmd($script, $timeoutMs = 5000) {
 }
 ```
 
-起動 → 数秒待って window/DrawDevice 初期化 → `Send-Cmd` でコマンドを送る。
-`win` 等 startup.tjs のグローバルもそのまま参照できる。
+启动 → 等待数秒完成 window/DrawDevice 初始化 → 用 `Send-Cmd` 发送命令。
+`win` 等 startup.tjs 的全局变量也可直接引用。
 
-- 1 コマンド = 1 式/1 文。**複数文を `;` で繋ぐと syntax error** になることが
-  あるので、分割送信するか `(function(){ ...; return x; })()` で包む。
+- 1 条命令 = 1 个表达式 / 1 条语句。**用 `;` 连接多条语句有时会成为
+  syntax error**，因此请分开发送，或用 `(function(){ ...; return x; })()` 包裹。
 
-## Agent API (入力注入 / キャプチャ / ダイアログ制御)
+## Agent API（输入注入 / 捕获 / 对话框控制）
 
-`Agent` は `System` 同様インスタンス不要でクラスメソッドを呼ぶ (SDL3 / WINVER +
-`KRKRZ_USE_ELEMENTS` + `KRKRZ_USE_REPL` で登録。`KRKRZ_REPL=OFF` で消える)。入力は
-実入力と同じ経路を通るのでゲームにも Elements ダイアログにも届く。
+`Agent` 与 `System` 一样无需实例即可调用类方法（SDL3 / WINVER +
+`KRKRZ_USE_ELEMENTS` + `KRKRZ_USE_REPL` 时注册。`KRKRZ_REPL=OFF` 时消失）。输入
+走与真实输入相同的路径，因此能到达游戏和 Elements 对话框。
 
-| メソッド | 用途 |
+| 方法 | 用途 |
 |---|---|
-| `Agent.mouseMove/mouseDown/mouseUp(x,y[,btn[,shift]])` | マウス (論理座標、btn: 0=左1=右2=中) |
-| `Agent.click(x,y[,btn[,shift]])` / `Agent.wheel(delta,x,y)` | クリック (move+down+up) / ホイール(120単位) |
-| `Agent.keyDown/keyUp/keyPress(vk[,shift])` | キー (vk は `VK_*` 数値、例 `VK_RETURN`) |
-| `Agent.text(str)` | アクティブダイアログへテキスト入力 (input_box 等) |
-| `Agent.ignoreRealMouse` | 真にすると**実マウス入力を捨てる**(Agent の注入だけ通す)。起動オプション `-ignoremouse=yes` でも設定可。人がポインタを動かしても測定が汚れない。⚠有効中は人の手でマウス操作できない |
-| `Agent.dialogs()` | アクティブダイアログ配列 `%[index,modal,active,screen,focused,x,y,w,h]` |
-| `Agent.closeDialog()` / `Agent.closeAllDialogs()` | 最前面 / 全ダイアログを閉じる |
-| `Agent.dialogClick(i,id)` / `Agent.dialogFocus(i,id)` | id 指定で起動 / フォーカス (座標不要) |
-| `Agent.captureScreen(path[,x,y,w,h])` | overlay 込み実画面を**次フレーム**で PNG 保存 (戻り値=path) |
-| `Agent.lastCapture()` | 直近キャプチャ結果 `%[path,width,height,ok]` |
-| `Agent.a11yTree()` | 読み上げツリー (スクリーンリーダーに見えるもの) を JSON 文字列で。`{"dialogs":[…],"game":…}`。スクリーンリーダー無しでも取れる |
-| `Agent.a11yLog([since])` | 読み上げログ `%[lines, next]` (「おおよそ何と読むか」の行: `[focus]` / `[value]` / `[state]` / `[caret]` / `[polite]` …)。REPL 稼働中だけ溜まる |
-| `Agent.a11yAction(node, action[, arg])` | スクリーンリーダーと同じ経路で操作 (キー合成ではない)。action = click / focus / increment / decrement / set_value |
+| `Agent.mouseMove/mouseDown/mouseUp(x,y[,btn[,shift]])` | 鼠标（逻辑坐标，btn：0=左 1=右 2=中） |
+| `Agent.click(x,y[,btn[,shift]])` / `Agent.wheel(delta,x,y)` | 点击（move+down+up）/ 滚轮（120 单位） |
+| `Agent.keyDown/keyUp/keyPress(vk[,shift])` | 键（vk 为 `VK_*` 数值，例 `VK_RETURN`） |
+| `Agent.text(str)` | 向活动对话框输入文本（input_box 等） |
+| `Agent.ignoreRealMouse` | 设为真时**丢弃真实鼠标输入**（只放行 Agent 注入）。也可用启动选项 `-ignoremouse=yes` 设置。人移动指针也不会弄脏测量。⚠启用期间人无法手动操作鼠标 |
+| `Agent.dialogs()` | 活动对话框数组 `%[index,modal,active,screen,focused,x,y,w,h]` |
+| `Agent.closeDialog()` / `Agent.closeAllDialogs()` | 关闭最前 / 全部对话框 |
+| `Agent.dialogClick(i,id)` / `Agent.dialogFocus(i,id)` | 按 id 指定启动 / 聚焦（无需坐标） |
+| `Agent.captureScreen(path[,x,y,w,h])` | 在**下一帧**保存含 overlay 的实际画面为 PNG（返回值=path） |
+| `Agent.lastCapture()` | 最近一次捕获结果 `%[path,width,height,ok]` |
+| `Agent.a11yTree()` | 以 JSON 字符串返回朗读树（屏幕阅读器所看到的内容）。`{"dialogs":[…],"game":…}`。没有屏幕阅读器也能获取 |
+| `Agent.a11yLog([since])` | 朗读日志 `%[lines, next]`（「大致会读成什么」的行：`[focus]` / `[value]` / `[state]` / `[caret]` / `[polite]` …）。仅在 REPL 运行期间积累 |
+| `Agent.a11yAction(node, action[, arg])` | 沿屏幕阅读器相同的路径操作（不是键合成）。action = click / focus / increment / decrement / set_value |
 
-検証フロー例 (ファイルチャネル)。`$CAP_DIR` はセッションの scratchpad など
-書き込み可能な作業ディレクトリの絶対パス:
+验证流程示例（文件通道）。`$CAP_DIR` 是会话 scratchpad 等
+可写工作目录的绝对路径：
 
 ```
 Send-Cmd "win.openMenu()"
-Send-Cmd "Agent.dialogs()"                       # 状態確認 (screen/rect)
+Send-Cmd "Agent.dialogs()"                       # 状态確認 (screen/rect)
 Send-Cmd "Agent.click(255,80)"                   # 座標クリックで遷移
 Send-Cmd "Agent.dialogClick(0,'sound')"          # or id 指定で操作
 Send-Cmd "Agent.captureScreen('$CAP_DIR/cap.png')" # 即 return、~1 フレーム後に保存
 # (少し待って) Read tool で cap.png を開いて目視確認
 ```
 
-`captureScreen` は内部で `RequestUpdate` を呼ぶのでアイドルでも保存される。
-既定 DrawDevice は `SDLOGLDrawDevice` (GL) で、`glReadPixels` 経由で読み戻す。
-**PrintWindow/BitBlt では GL クライアント領域が黒くなる問題を回避**できるのが
-利点 (走らせて数百 ms 待って captureScreen→Read で目視、が定番)。
+`captureScreen` 内部会调用 `RequestUpdate`，因此即使空闲也会保存。
+默认 DrawDevice 为 `SDLOGLDrawDevice`（GL），经 `glReadPixels` 读回。
+优点是**可规避 PrintWindow/BitBlt 下 GL 客户区变黑的问题**
+（跑起来等几百 ms 后 captureScreen→Read 目视确认，是常规做法）。
 
-## stdin への TJS 送り込み (console REPL / 人間向け)
+## 向 stdin 送入 TJS（console REPL / 面向人类）
 
-REPL worker は `ic_readline` (icline) または fgets shim で 1 行ずつ読む。
-worker からのリクエストは main スレッドの `TVPDrainREPL()` が毎フレーム
-1 件 drain して `TVPExecuteExpression` で実行する。
+REPL 工作线程通过 `ic_readline`（icline）或 fgets shim 逐行读取。
+来自工作线程的请求由主线程的 `TVPDrainREPL()` 每帧取出 1 条，
+用 `TVPExecuteExpression` 执行。
 
-### バッチ実行 (推奨: 検証・スモーク用)
+### 批量执行（推荐：用于验证 / 冒烟测试）
 
-複数行を流して結果を拾う (data パスは絶対パスで、自分の構成に読み替え):
+送入多行并拾取结果（data 路径用绝对路径，请按自己的构成替换）：
 
 ```bash
 printf '%s\n' \
@@ -296,67 +292,67 @@ printf '%s\n' \
   | krkrz64.exe <ABS_DATA_DIR> -repl -nostartup -loglevel=info
 ```
 
-`=>` 行が評価結果。`exit` / `quit` で REPL を閉じてプロセス終了。
+`=>` 行是求值结果。用 `exit` / `quit` 关闭 REPL 并结束进程。
 
-### icline と TTY の注意
+### icline 与 TTY 的注意事项
 
-既定ビルドは icline (行編集・履歴・色) を使い、raw TTY を期待する。
-パイプ stdin だと挙動が乱れる場合があるため、**エージェント/ヘッドレスで
-パイプ駆動するなら `KRKRZ_REPL_LINE_EDIT=OFF` でビルド**すると fgets ベースの
-shim (`KRKRZ_REPL_NO_ICLINE`) になり、パイプ stdin をそのまま素直に処理できる。
+默认构建使用 icline（行编辑・历史・颜色），期待 raw TTY。
+管道 stdin 时行为可能紊乱，因此**agent / 无头（headless）通过管道驱动的话，
+用 `KRKRZ_REPL_LINE_EDIT=OFF` 构建**会变成基于 fgets 的垫片
+（`KRKRZ_REPL_NO_ICLINE`），可原样顺畅处理管道 stdin。
 
-- engine 単独: `cmake --preset x64-windows -DKRKRZ_REPL_LINE_EDIT=OFF`
-- umbrella: `PRESET=x64-windows CMAKEOPT='-DKRKRZ_REPL_LINE_EDIT=OFF' make prebuild build`
+- engine 单仓库：`cmake --preset x64-windows -DKRKRZ_REPL_LINE_EDIT=OFF`
+- umbrella：`PRESET=x64-windows CMAKEOPT='-DKRKRZ_REPL_LINE_EDIT=OFF' make prebuild build`
 
-### 長いスクリプトは Storages 経由
+### 长脚本经 Storages 执行
 
-複数行スクリプトは stdin で送るより、ファイルに置いて REPL から呼ぶ方が確実:
+多行脚本与其经 stdin 发送，不如放在文件里、从 REPL 调用更可靠：
 
 ```tjs
 Scripts.execStorage("mytest.tjs");      // data/ 配下 (autopath)
 ```
 
-`-nostartup` で立ち上げてから上記でテストを開始する、が基本フロー。
+用 `-nostartup` 启动后再以上述方式开始测试，是基本流程。
 
-## ドットコマンド
+## 点命令
 
-`.help` で一覧。**console / `-replfile` / `-replweb` の 3 フロントすべてで使える**
-(ファイルチャネルでは先頭が `.` の行がドットコマンドとして扱われ、出力行が
-応答 JSON の `result` に改行区切りで入る)。主なもの:
+用 `.help` 查看列表。**console / `-replfile` / `-replweb` 3 个前端全部可用**
+（文件通道中，以 `.` 开头的行按点命令处理，输出行以换行分隔
+放入响应 JSON 的 `result`）。主要命令：
 
-| コマンド | 用途 |
+| 命令 | 用途 |
 |---|---|
-| `.help` | コマンド一覧 |
-| `.clear` | multiline 入力を破棄 |
-| `.depth [N]` / `.compact [on/off]` | 結果の pretty-print 設定 |
-| `.mem` | メモリ要約 1 行 (File/Bitmap/Sound/Global/Process/SysAlloc) |
-| `.memdump` | 全メモリ統計をログへ (`TVPHeapDump`) |
-| `.memsites [N] [関数名の一部]` | 生存確保を呼び出し元別に上位 N 件 (診断ビルド + `-memstatsite` 起動時のみ) |
-| `.sysalloc` | システムアロケータ情報 |
-| `.filecache` / `.imagecache` | ファイル/画像キャッシュ一覧をログへ |
-| `.memoverlay [on/off]` / `.padoverlay [on/off]` | 画面オーバレイ表示トグル |
-| `.mempeakclear` | peak_used リセット |
-| `.cap [path]` | 画面キャプチャ (`Agent.captureScreen`、省略時 agent_cap.png) |
-| `.dlg` / `.dlgclose` | ダイアログ一覧 / 全クローズ (`Agent.dialogs`/`closeAllDialogs`) |
-| `.click X Y` | (X,Y) にクリック注入 (`Agent.click`) |
-| `.a11y` | 読み上げツリーを表示 (`Agent.a11yTree`) |
-| `.a11ylog [N]` | 読み上げログの N 行目以降 (`Agent.a11yLog`) |
-| `.a11ydo <node> <action> [arg]` | 読み上げツリーのノードを AT の経路で操作 (`Agent.a11yAction`)。node は `.a11y` の id (画面 JSON の `"id"` / setGameA11y の id / `layer:<Layer.name>` / `#<hex>`) |
+| `.help` | 命令列表 |
+| `.clear` | 丢弃 multiline 输入 |
+| `.depth [N]` / `.compact [on/off]` | 结果的 pretty-print 设置 |
+| `.mem` | 内存摘要 1 行（File/Bitmap/Sound/Global/Process/SysAlloc） |
+| `.memdump` | 把全部内存统计写入日志（`TVPHeapDump`） |
+| `.memsites [N] [関数名の一部]` | 存活分配按调用方统计的前 N 条（仅诊断构建 + `-memstatsite` 启动时） |
+| `.sysalloc` | 系统分配器信息 |
+| `.filecache` / `.imagecache` | 把文件 / 图像缓存列表写入日志 |
+| `.memoverlay [on/off]` / `.padoverlay [on/off]` | 画面覆盖层显示开关 |
+| `.mempeakclear` | 重置 peak_used |
+| `.cap [path]` | 画面捕获（`Agent.captureScreen`，省略时 agent_cap.png） |
+| `.dlg` / `.dlgclose` | 对话框列表 / 全部关闭（`Agent.dialogs`/`closeAllDialogs`） |
+| `.click X Y` | 向 (X,Y) 注入点击（`Agent.click`） |
+| `.a11y` | 显示朗读树（`Agent.a11yTree`） |
+| `.a11ylog [N]` | 朗读日志第 N 行起（`Agent.a11yLog`） |
+| `.a11ydo <node> <action> [arg]` | 沿 AT 路径操作朗读树的节点（`Agent.a11yAction`）。node 是 `.a11y` 的 id（画面 JSON 的 `"id"` / setGameA11y 的 id / `layer:<Layer.name>` / `#<hex>`） |
 | `.say <text>` | `ElementsDialog.announce` |
-| `.watch` | 監視式の一覧を `id: 式 = 値` で表示 (表示前に全件評価) |
-| `.watch add EXPR` | 監視式を追加して即評価 (式は空白を含んでよい) |
-| `.watch rm ID` / `.watch rm all` | 監視式の削除 / 全消し |
-| `.watch edit ID EXPR` | 監視式の差し替え |
-| `.watch auto [ms/on/off]` | 自動更新の間隔 (`on`=500ms / `0`=毎フレーム / 下限 100ms) |
-| `.event [on/off/toggle]` | `System.eventDisabled` の表示 / 切替 |
+| `.watch` | 以 `id: 式 = 値` 显示监视表达式列表（显示前先全部求值） |
+| `.watch add EXPR` | 添加监视表达式并立即求值（表达式可含空格） |
+| `.watch rm ID` / `.watch rm all` | 删除监视表达式 / 全部清除 |
+| `.watch edit ID EXPR` | 替换监视表达式 |
+| `.watch auto [ms/on/off]` | 自动更新的间隔（`on`=500ms / `0`=每帧 / 下限 100ms） |
+| `.event [on/off/toggle]` | `System.eventDisabled` 的显示 / 切换 |
 
-TJS の評価は dot で始まらない行をそのまま入力する (式・文どちらも可、
-括弧/クォートが閉じるまで複数行継続)。
+TJS 求值直接把不以 dot 开头的行原样输入（表达式・语句均可，
+直到括号 / 引号闭合前可跨多行）。
 
-### 監視式 (`.watch`) — 状態を張り込んで観測する
+### 监视表达式（`.watch`）——挂载状态进行观测
 
-吉里吉里2 のデバッグ窓「監視式」相当。**毎回同じ式を打ち直さずに状態を見張る**
-ための道具で、値の変化を追う検証に向く。
+相当于吉里吉里2 调试窗口的「监视表达式」。是**不必每次重打相同表达式
+就能盯住状态**的工具，适合追踪值变化的验证。
 
 ```
 .watch add win.layer.left
@@ -365,56 +361,56 @@ TJS の評価は dot で始まらない行をそのまま入力する (式・文
 .watch               # 一覧 (表示前に全件評価する)
 ```
 
-- 評価コンテキストは **global 固定**。式が例外を投げても
-  `(error) <メッセージ>` を**値として**並べるだけで、REPL もアプリも死なない。
-- **一覧表示は評価を伴う**ので、「自動更新だけで評価されたか」を確かめたいときは
-  副作用のある式 (カウンタを増やす等) を仕込んで別コマンドで読む。
-- 式リストと間隔は**カレントディレクトリの `.krkrz_watch` に保存**され、次回起動で
-  読み戻る (`-replwatchfile=<path>` で変更、`=no` で無効)。**検証で消したいときは
-  このファイルを消すか `=no` を付ける**。
-- **HTTP からも同じコアを触れる** (`-replweb` 併用時):
+- 求值上下文**固定为 global**。即使表达式抛出异常，也只是把
+  `(error) <メッセージ>` **当作值**摆出来，REPL 和应用都不会死。
+- **列表显示会伴随求值**，因此想确认「是否仅靠自动更新就求值了」时，
+  可埋入带副作用的表达式（如计数器自增）再用别的命令读取。
+- 表达式列表与间隔**保存在当前目录的 `.krkrz_watch`**，下次启动时
+  读回（用 `-replwatchfile=<path>` 更改、`=no` 禁用）。**验证时想清除，
+  就删除该文件或加 `=no`**。
+- **从 HTTP 也能触达同一核心**（并用 `-replweb` 时）：
   `curl -s -X POST -d 'op=add&expr=…' localhost:8899/watch` /
-  `curl -s localhost:8899/watch` (評価しない。`?eval=1` で評価) /
-  `curl -N localhost:8899/sub/watch` (自動更新の push)。
-  ドットコマンドと同じリストを見るので、**片方で足して片方で観測**できる。
+  `curl -s localhost:8899/watch`（不求值。用 `?eval=1` 求值）/
+  `curl -N localhost:8899/sub/watch`（自动更新的 push）。
+  看到的是与点命令相同的列表，因此**一边添加、另一边观测**即可。
 
-## 典型ワークフロー (エージェント)
+## 典型工作流程（agent）
 
-1. `-repl -nostartup` で起動 (window も startup も無い静止状態)。
-2. REPL から最小 Window を作って `visible=true` → SDL イベントループに入る
-   (window が無いと描画ループに入らない種類の検証はこれが要る)。
-3. 検証スクリプトを `Scripts.execStorage` か stdin で評価。
-4. 例外が出てもプロセスは生きているので、コンソールの例外/trace を読んで
-   スクリプトを直し、再度評価。
-5. `.mem` 等で状態を観測。`exit` で終了。
+1. 用 `-repl -nostartup` 启动（既无 window 也无 startup 的静止状态）。
+2. 从 REPL 创建最小 Window 并把 `visible=true` → 进入 SDL 事件循环
+   （没有 window 就不进入绘制循环的那类验证需要这一步）。
+3. 用 `Scripts.execStorage` 或 stdin 求值验证脚本。
+4. 即使出现异常进程也还活着，因此读取控制台的异常/trace、
+   修改脚本后再次求值。
+5. 用 `.mem` 等观察状态。用 `exit` 退出。
 
-## コアデモ全シーンの表示確認 (`-demotest` / `-demotestcap`)
+## 核心演示全场景显示确认（`-demotest` / `-demotestcap`）
 
-エンジン変更後の「全部ちゃんと映るか」の回帰確認は、REPL で 1 シーンずつ
-送るより **ギャラリーの自動巡回 + 自動キャプチャ**が速い (demolib 機能。
-SSOT は `data/demolib/readme.txt` の「ヘッドレス自動テスト」)。
+引擎变更后「是否全都正常显示」的回归确认，比起在 REPL 里逐个发送场景，
+**画廊自动巡回 + 自动捕获**更快（demolib 功能。
+SSOT 是 `data/demolib/readme.txt` 的「ヘッドレス自動テスト」（无头自动测试）一节）。
 
 ```bash
 krkrz <ABS>/src/core/data -demotest -demotestcap=<ABS_CAP_DIR>
 # 例 (Linux、エージェントのシェルから): WAYLAND_DISPLAY=wayland-0 を前置
 ```
 
-- 全シーンを 40 フレームずつ巡回し、各シーンを `<dir>/sceneNN.png` に保存して
-  `@demotest:ok` で自動終了 (01 = メニュー)。ログの
-  `@demotest:cap <path> <シーン名>` が番号 → シーン名の対応、
-  `@demotest:<シーン名> ...` が各シーンの自己検証結果
-- `<dir>` は絶対パス、無ければ作られる。`-demotestcap` 単独でも巡回する
-- 保存は `System.captureScreen` なので REPL 有効ビルドのみ (MASTER では
-  `@demotest:cap unavailable` が出て撮影なし)。実ウィンドウが要る
-- 完走しない (ハング / abort) こと自体が不具合のシグナル。最後に出た
-  `@demotest:scene N/M` の次のシーン (またはその離脱処理) を疑う
-- 目視は PNG を 1 枚ずつ Read するより、PIL 等で縮小して数枚ずつ
-  並べた一覧画像を作って Read すると速い
-- 乱数・アニメのあるシーン (画像処理 / パーティクル / FPS 表示等) は毎回
-  画素が変わるので、前回キャプチャとの差分比較ではノイズとして扱う
+- 每场景巡回 40 帧，把各场景保存为 `<dir>/sceneNN.png`，
+  以 `@demotest:ok` 自动结束（01 = 菜单）。日志中
+  `@demotest:cap <path> <シーン名>` 是编号 → 场景名对应关系、
+  `@demotest:<シーン名> ...` 是各场景的自验证结果
+- `<dir>` 为绝对路径，不存在时会被创建。单独 `-demotestcap` 也会巡回
+- 保存使用 `System.captureScreen`，因此仅限 REPL 有效的构建（MASTER 会
+  输出 `@demotest:cap unavailable` 而不拍摄）。需要真实窗口
+- 跑不完全程（挂起 / abort）本身就是故障信号。怀疑最后一条
+  `@demotest:scene N/M` 的下一个场景（或其退出处理）
+- 目视确认时，与其逐张 Read PNG，不如用 PIL 等缩小后拼成
+  数张并排的列表图再 Read，速度更快
+- 含随机数・动画的场景（图像处理 / 粒子 / FPS 显示等）每次
+  像素都会变化，与上次捕获做差异比较时应作为噪声处理
 
-**撮れるのは各シーンの最初のページだけ**。複数ページあるシーン (GL Canvas 等)
-の残りは `-replfile` で起動して送る:
+**能拍到的只有各场景的第一页**。多页场景（GL Canvas 等）
+的剩余部分用 `-replfile` 启动来发送：
 
 ```
 demoShell.switchTo(13)              # シーン番号 (0 = メニュー、sceneNN の NN-1)
@@ -422,19 +418,19 @@ Agent.keyPress(VK_RIGHT)            # シーン内のページ送り
 System.captureScreen("<ABS>/p2.png")  # 次フレームで保存されるので少し待つ
 ```
 
-`demoShell` は `runDemoHub` が global に置いている DemoShell インスタンス。
+`demoShell` 是 `runDemoHub` 放在 global 中的 DemoShell 实例。
 
-## 関連 (パスは engine ルート相対 / umbrella では `src/core/` 前置)
+## 相关（路径以 engine 根为基准 / umbrella 下前置 `src/core/`）
 
-- 言語仕様: skill `tjs2` / 本体 API: skill `krkrz`
-- ビルド: engine 単独は `cmake --preset x64-windows`、umbrella は `make`
-  (プリセット `src/core/CMakePresets.json`)。詳細は各 `CLAUDE.md`
-- REPL 実装: `common/utils/REPL.cpp` / 共有実行キュー:
-  `common/utils/ReplMainQueue.cpp` / ファイルチャネル:
-  `common/utils/ReplFileChannel.cpp` / 有効化: CMake `KRKRZ_REPL`
-  (= `KRKRZ_USE_REPL`)
-- Agent API: `common/environ/AgentControlIntf.cpp` (共通) + 入力 seam
-  `generic/environ/AgentInput.cpp` (SDL3/LIB) / `win32/environ/AgentInput.cpp` (WINVER) /
-  キャプチャ: `common/visual/ScreenCapture.cpp`
-- 詳細ドキュメント: `doc/REPL.md` の「エージェント駆動」節
-- 複数ダイアログ同時表示の仕様: `doc/ElementsDialog.md`
+- 语言规格：skill `tjs2` / 引擎本体 API：skill `krkrz`
+- 构建：engine 单仓库用 `cmake --preset x64-windows`，umbrella 用 `make`
+  （预设 `src/core/CMakePresets.json`）。详见各 `CLAUDE.md`
+- REPL 实现：`common/utils/REPL.cpp` / 共享执行队列：
+  `common/utils/ReplMainQueue.cpp` / 文件通道：
+  `common/utils/ReplFileChannel.cpp` / 启用：CMake `KRKRZ_REPL`
+  （= `KRKRZ_USE_REPL`）
+- Agent API：`common/environ/AgentControlIntf.cpp`（通用部分）+ 输入 seam
+  `generic/environ/AgentInput.cpp`（SDL3/LIB）/ `win32/environ/AgentInput.cpp`（WINVER）/
+  捕获：`common/visual/ScreenCapture.cpp`
+- 详细文档：`doc/REPL.md` 的「エージェント駆動」（agent 驱动）一节
+- 多对话框同时显示的规格：`doc/ElementsDialog.md`

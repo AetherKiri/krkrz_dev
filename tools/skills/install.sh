@@ -219,7 +219,7 @@ if [ "$MODE" = dist ] && [ "$DRYRUN" = 0 ]; then
 {
   "name": "$PLUGIN_NAME",
   "version": "0.1.0",
-  "description": "吉里吉里Z (krkrz) 開発用スキル集 — 本体クラス API / TJS2 言語 / Elements UI / REPL 駆動 / ブラウザ UI",
+  "description": "吉里吉里Z (krkrz) 开发用技能集 — 引擎核心类 API / TJS2 语言 / Elements UI / REPL 驱动 / 浏览器 UI",
   "author": { "name": "Go Watanabe" },
   "repository": "https://github.com/wamsoft/krkrz_dev",
   "keywords": ["kirikiri", "krkrz", "tjs2", "game-engine"]
@@ -228,12 +228,12 @@ JSON
   cat > "$DEST/.claude-plugin/marketplace.json" <<JSON
 {
   "name": "$MARKETPLACE_NAME",
-  "description": "吉里吉里Z (krkrz) 開発用スキルの配布元",
+  "description": "吉里吉里Z (krkrz) 开发用技能的发布源",
   "owner": { "name": "Go Watanabe" },
   "plugins": [
     {
       "name": "$PLUGIN_NAME",
-      "description": "吉里吉里Z (krkrz) 開発用スキル集",
+      "description": "吉里吉里Z (krkrz) 开发用技能集",
       "source": "./plugins/$PLUGIN_NAME"
     }
   ]
