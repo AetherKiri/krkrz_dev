@@ -11,12 +11,6 @@ name: Deploy docs to Pages
 on:
   push:
     branches: [develop, master]
-    paths:
-      - "doc/**"
-      - "mkdocs.yml"
-      - "tools/docgen/requirements.txt"
-      - ".claude/skills/krkrz-doc-zh/**"
-      - ".github/workflows/docs-pages.yml"
   workflow_dispatch:
 
 permissions:
