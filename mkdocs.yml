@@ -65,6 +65,7 @@ plugins:
           name: 简体中文
           build: true
           site_name: 吉里吉里Z 文档
+          site_description: 吉里吉里Z (Kirikiri Z) 的 TJS2 参考文档・指南・规格文档（简体中文）
           theme:
             language: zh
           nav_translations:
