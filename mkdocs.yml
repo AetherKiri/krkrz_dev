@@ -8,6 +8,9 @@ copyright: "(c) Kirikiri Z Project / Wamsoft Ltd. Partnership"
 
 docs_dir: doc
 
+validation:
+  anchors: warn
+
 # ブラウザ実行デモ (doc/_assets/demo) を iframe 埋め込みで動かすため、全ページで
 # coi-serviceworker を登録し crossOriginIsolated (SharedArrayBuffer) を成立させる。
 # GitHub Pages は COOP/COEP ヘッダを設定できないため、SW でクライアント側に注入する。
@@ -48,6 +51,142 @@ plugins:
   - search:
       lang: ja
       separator: '[\s\-,:!=\[\]()"/]+|\.(?!\d)|&[lg]t;'
+  - i18n:
+      docs_structure: folder
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: ja
+          default: true
+          name: 日本語
+          build: true
+        - locale: zh
+          name: 简体中文
+          build: true
+          site_name: 吉里吉里Z 文档
+          theme:
+            language: zh
+          nav_translations:
+            ホーム: 首页
+            デモ: 演示
+            吉里吉里Z: 吉里吉里Z
+            TJS2言語仕様: TJS2 语言规范
+            クラスリファレンス: 类参考
+            仕様書: 规格文档
+            周辺情報: 周边信息
+            入門・運用: 入门与运维
+            サブシステム: 子系统
+            付属ツール: 附带工具
+            定数一覧: 常量列表
+            概要: 概要
+            構文: 语法
+            言語要素: 语言要素
+            内部仕様: 内部实现
+            吉里吉里Z コアクラス: 吉里吉里Z 核心类
+            吉里吉里Z 3D機能クラス: 吉里吉里Z 3D 功能类
+            吉里吉里Z 管理機能クラス: 吉里吉里Z 管理功能类
+            TJS2 組み込みクラス・型: TJS2 内置类与类型
+            プラグイン拡張クラス: 插件扩展类
+            ユーザー向け情報: 面向用户的信息
+            TJS2 で利用する機能: TJS2 可用的功能
+            ツール: 工具
+            本体 (exe) 変更者向け情報: 面向本体（exe）修改者的信息
+            ライセンス: 许可证
+            # guide 页面标题
+            起動: 启动
+            コマンドラインオプション: 命令行选项
+            吉里吉里設定: 吉里吉里设置
+            コンソール: 控制台
+            デバッグ: 调试
+            環境依存の不具合: 环境相关的问题
+            著作権など: 版权等
+            ライセンス情報の取得と表示: 许可证信息的获取与显示
+            同梱ライセンス一覧: 随附许可证列表
+            ファイル一覧: 文件列表
+            イベントシステム: 事件系统
+            グラフィックシステム: 图形系统
+            Layer と Bitmap と ImageFunction: Layer、Bitmap 与 ImageFunction
+            3Dグラフィックシステム: 3D 图形系统
+            サウンドシステム: 声音系统
+            ストレージシステム: 存储系统
+            ダイアログ: 对话框
+            読み上げ (スクリーンリーダー): 朗读 (屏幕阅读器)
+            フォントシステム: 字体系统
+            トランジション: 转场
+            プラグイン: 插件
+            ファイル破損チェックツール: 文件损坏检查工具
+            レンダリング済みフォントデータ作成ツール: 预渲染字体数据创建工具
+            ループチューナ: 循环调谐器
+            キー・署名ツール: 密钥与签名工具
+            画像フォーマットコンバータ: 图像格式转换器
+            仮想キーコード: 虚拟键码
+            マウスカーソル: 鼠标光标
+            色定数: 颜色常量
+            # topics 页面标题
+            エンジン設定ツール: 引擎设置工具
+            ツールチップの表示方法: 工具提示的显示方法
+            非同期画像読み込み: 异步图像加载
+            吉里吉里2と吉里吉里Zの判別方法: 吉里吉里2 与吉里吉里Z 的判别方法
+            動画の再生方法: 视频的播放方法
+            Wamsoft 派生版で削除/追加された機能: Wamsoft 派生版中删除/新增的功能
+            吉里吉里Zで削除された機能: 吉里吉里Z 中删除的功能
+            サポートするファイルフォーマット: 支持的文件格式
+            型指定構文: 类型指定语法
+            よくある落とし穴: 常见陷阱
+            エンジン設定の追加/編集: 引擎设置的添加/编辑
+            吉里吉里Z固有のクラッキング対策: 吉里吉里Z 特有的破解对策
+            メモリ不足対策: 内存不足对策
+            メモリ観測・リーク調査: 内存观测与泄漏排查
+            描画スレッドプール利用率の計測 (DrawStats): 绘制线程池利用率测量 (DrawStats)
+            Elements UI 機構の全体像: Elements UI 机制全貌
+            ゲームパッド入力: 手柄输入
+            ゲームパッド状態の観察 (PadOverlay): 手柄状态观察 (PadOverlay)
+            REPL (対話型 TJS シェル): REPL (交互式 TJS shell)
+            Steam Deck 実機確認 (リリース前チェック): Steam Deck 实机确认 (发布前检查)
+            Linux 版の配布パッケージ (krkrz_linux): Linux 版发布包 (krkrz_linux)
+            ゲーム画面の表示画角制御 (ビューポート): 游戏画面视角控制 (viewport)
+            ログ出力: 日志输出
+            # specification 页面标题
+            システム構成: 系统构成
+            ファイルフォーマット: 文件格式
+            動画再生機能: 视频播放功能
+            画像処理機能: 图像处理功能
+            音声再生機能: 音频播放功能
+            アクセシビリティ (スクリーンリーダー): 无障碍 (屏幕阅读器)
+            # tjs2 页面标题（已翻译部分）
+            TJS2 について: 关于 TJS2
+            データ型: 数据类型
+            基本型: 基本类型
+            for ステートメント: for 语句
+            Date クラス: Date 类
+            Exception クラス: Exception 类
+            オクテット列: 字节序列
+            iTJSDispatch2 インターフェース: iTJSDispatch2 接口
+            スタイルなど: 样式等
+            トークン: 词元
+            項: 项
+            式と演算子: 表达式与运算符
+            ステートメントとブロック: 语句与块
+            if ステートメント: if 语句
+            switch ステートメント: switch 语句
+            while ステートメント: while 语句
+            with ステートメント: with 语句
+            例外処理: 异常处理
+            プリプロセッサ: 预处理器
+            変数: 变量
+            関数: 函数
+            クラス: 类
+            プロパティ: 属性
+            組み込み方法: 嵌入方法
+            tTJSVariant 型: tTJSVariant 类型
+            仮想マシン: 虚拟机
+            Array クラス: Array 类
+            Dictionary クラス: Dictionary 类
+            Math クラス: Math 类
+            Math.RandomGenerator クラス: Math.RandomGenerator 类
+            RegExp クラス: RegExp 类
+            文字列: 字符串
 
 markdown_extensions:
   - admonition
@@ -68,6 +207,7 @@ exclude_docs: |
   _inventory.json
 
 nav:
+  - ホーム: index.md
   - デモ: demos.md
   - 吉里吉里Z:
     - guide/about.md
