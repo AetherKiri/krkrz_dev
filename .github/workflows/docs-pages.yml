@@ -1,5 +1,13 @@
 name: Deploy docs to Pages
 
+# フォーク (GitHub Pages) での運用メモ:
+#   - デプロイ元は GitHub Actions。リポジトリ設定 → Pages → Source を
+#     "GitHub Actions" にする (または gh api --method POST repos/{...}/pages
+#     -f build_type=workflow で有効化)
+#   - サイトの URL は mkdocs.yml の site_url が正となる (フォークでは
+#     https://<owner>.github.io/krkrz_dev/)
+#   - 翻訳 (doc/zh/) は krkrz-doc-zh スキルの check_pair.py が構造を検証済み
+
 on:
   push:
     branches: [develop, master]
@@ -7,6 +15,7 @@ on:
       - "doc/**"
       - "mkdocs.yml"
       - "tools/docgen/requirements.txt"
+      - ".claude/skills/krkrz-doc-zh/**"
       - ".github/workflows/docs-pages.yml"
   workflow_dispatch:
 

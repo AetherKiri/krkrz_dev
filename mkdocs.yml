@@ -1,9 +1,9 @@
 site_name: 吉里吉里Z ドキュメント
 site_description: 吉里吉里Z (Kirikiri Z) の TJS2 リファレンス・ガイド・仕様書
-site_url: https://wamsoft.github.io/krkrz_dev/
-repo_url: https://github.com/wamsoft/krkrz_dev
-repo_name: wamsoft/krkrz_dev
-edit_uri: edit/develop/doc/
+site_url: https://aetherkiri.github.io/krkrz_dev/
+repo_url: https://github.com/AetherKiri/krkrz_dev
+repo_name: AetherKiri/krkrz_dev
+edit_uri: edit/master/doc/
 copyright: "(c) Kirikiri Z Project / Wamsoft Ltd. Partnership"
 
 docs_dir: doc
