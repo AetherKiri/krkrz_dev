@@ -68,4 +68,4 @@ instead of naming the client. An issue key belongs in the client-side repo's com
 here, the change must explain itself. When in doubt, ask "will someone outside this
 project read this repo?" — the answer is yes.
 
-Source is UTF-8; comments, identifiers, and commit messages are frequently in Japanese — keep that style when editing existing files. The default branch here is `develop` (not `master`); PRs typically target `master` only for releases.
+Source is UTF-8; write comments, identifiers, and commit messages in Simplified Chinese by default. The default branch here is `develop` (not `master`); PRs typically target `master` only for releases.
